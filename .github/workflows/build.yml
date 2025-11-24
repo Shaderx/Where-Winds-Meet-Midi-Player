@@ -59,7 +59,7 @@ jobs:
           if-no-files-found: error
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.event.inputs.version || github.ref_name }}
           name: Release v${{ github.event.inputs.version || github.ref_name }}
@@ -77,5 +77,3 @@ jobs:
             ## What's New
 
             See commits for changes in this release.
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
