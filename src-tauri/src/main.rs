@@ -348,6 +348,7 @@ fn main() {
     let app_state = Arc::new(Mutex::new(AppState::new()));
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(app_state)
         .setup(|app| {
             start_hotkey_listener(app.handle().clone());

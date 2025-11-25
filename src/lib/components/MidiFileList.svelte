@@ -3,6 +3,7 @@
   import { fade, fly } from "svelte/transition";
   import { onMount, onDestroy } from "svelte";
   import { listen } from "@tauri-apps/api/event";
+  import { open } from "@tauri-apps/plugin-dialog";
   import {
     midiFiles,
     currentFile,
@@ -80,6 +81,22 @@
       showToast(`Imported ${imported}, ${failed} failed`, "info");
     } else {
       showToast("Failed to import files", "error");
+    }
+  }
+
+  async function openFileDialog() {
+    try {
+      const selected = await open({
+        multiple: true,
+        filters: [{ name: "MIDI Files", extensions: ["mid"] }],
+      });
+
+      if (selected && selected.length > 0) {
+        await importFiles(selected);
+      }
+    } catch (error) {
+      console.error("Failed to open file dialog:", error);
+      showToast("Failed to open file dialog", "error");
     }
   }
 
@@ -172,7 +189,17 @@
 
   <!-- Header -->
   <div class="mb-4">
-    <h2 class="text-2xl font-bold mb-2">Your Library</h2>
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="text-2xl font-bold">Your Library</h2>
+      <button
+        class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-sm font-medium transition-all"
+        onclick={openFileDialog}
+        title="Import MIDI files"
+      >
+        <Icon icon="mdi:plus" class="w-4 h-4" />
+        Import
+      </button>
+    </div>
     <p class="text-sm text-white/60 mb-4">
       {filteredFiles.length} of {$midiFiles.length} songs
     </p>
