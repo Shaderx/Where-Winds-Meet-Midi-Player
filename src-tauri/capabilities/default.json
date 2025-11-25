@@ -6,6 +6,10 @@
   "permissions": [
     "core:default",
     "core:window:allow-set-ignore-cursor-events",
+    "core:window:allow-inner-size",
+    "core:window:allow-inner-position",
+    "core:window:allow-set-size",
+    "core:window:allow-set-min-size",
     "dialog:default"
   ]
 }

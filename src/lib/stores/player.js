@@ -1,6 +1,7 @@
 import { writable, derived } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 
 // Player state
 export const isPlaying = writable(false);
@@ -25,7 +26,51 @@ export const favorites = writable([]);
 // UI state
 export const isDraggable = writable(true);
 export const isMinimized = writable(false);
+export const miniMode = writable(false);
 export const smartPause = writable(true);
+
+// Store previous window size/position for restore
+let previousWindowState = null;
+
+// Toggle mini mode with window resize
+export async function toggleMiniMode() {
+  const currentMiniMode = get(miniMode);
+  const appWindow = getCurrentWindow();
+
+  if (!currentMiniMode) {
+    // Entering mini mode - save current state and resize
+    try {
+      const size = await appWindow.innerSize();
+      const position = await appWindow.innerPosition();
+      previousWindowState = {
+        width: size.width,
+        height: size.height,
+        x: position.x,
+        y: position.y
+      };
+
+      // Set to mini size (64x88 for the floating icon + drag handle)
+      await appWindow.setMinSize(new LogicalSize(64, 88));
+      await appWindow.setSize(new LogicalSize(64, 88));
+    } catch (error) {
+      console.error('Failed to resize window for mini mode:', error);
+    }
+  } else {
+    // Exiting mini mode - restore previous state
+    try {
+      await appWindow.setMinSize(new LogicalSize(960, 480));
+      if (previousWindowState) {
+        await appWindow.setSize(new LogicalSize(previousWindowState.width, previousWindowState.height));
+      } else {
+        await appWindow.setSize(new LogicalSize(1180, 560));
+      }
+    } catch (error) {
+      console.error('Failed to restore window from mini mode:', error);
+    }
+  }
+
+  miniMode.update(v => !v);
+}
 
 let smartPauseCooldownUntil = 0;
 
