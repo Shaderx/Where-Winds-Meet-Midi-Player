@@ -11,7 +11,14 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SW_RESTORE,
 };
 #[cfg(target_os = "windows")]
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    SendInput, INPUT, INPUT_MOUSE, MOUSEINPUT,
+    MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
+    MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_MOVE,
+};
+#[cfg(target_os = "windows")]
 use windows::Win32::Foundation::{BOOL, HWND, LPARAM};
+
 
 #[cfg(target_os = "windows")]
 const TARGET_WINDOW_KEYWORDS: [&str; 4] =
@@ -66,6 +73,8 @@ pub fn key_up(key: &str) {
         let _ = enigo.key(k, Direction::Release);
     }
 }
+
+
 
 fn string_to_key(key: &str) -> Option<Key> {
     match key.to_lowercase().as_str() {
@@ -140,3 +149,147 @@ pub fn focus_black_desert_window() -> Result<(), String> {
 pub fn focus_black_desert_window() -> Result<(), String> {
     Ok(())
 }
+
+/// Click at a specific screen position
+#[cfg(target_os = "windows")]
+pub fn mouse_click(x: i32, y: i32) {
+    use windows::Win32::UI::WindowsAndMessaging::GetSystemMetrics;
+    use windows::Win32::UI::WindowsAndMessaging::{SM_CXSCREEN, SM_CYSCREEN};
+
+    unsafe {
+        // Get screen dimensions for absolute positioning
+        let screen_width = GetSystemMetrics(SM_CXSCREEN);
+        let screen_height = GetSystemMetrics(SM_CYSCREEN);
+
+        // Convert to absolute coordinates (0-65535 range)
+        let abs_x = (x as i64 * 65536 / screen_width as i64) as i32;
+        let abs_y = (y as i64 * 65536 / screen_height as i64) as i32;
+
+        // Move mouse and click
+        let inputs = [
+            // Move to position
+            INPUT {
+                r#type: INPUT_MOUSE,
+                Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 {
+                    mi: MOUSEINPUT {
+                        dx: abs_x,
+                        dy: abs_y,
+                        mouseData: 0,
+                        dwFlags: MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE,
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
+                },
+            },
+            // Mouse down
+            INPUT {
+                r#type: INPUT_MOUSE,
+                Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 {
+                    mi: MOUSEINPUT {
+                        dx: abs_x,
+                        dy: abs_y,
+                        mouseData: 0,
+                        dwFlags: MOUSEEVENTF_LEFTDOWN | MOUSEEVENTF_ABSOLUTE,
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
+                },
+            },
+            // Mouse up
+            INPUT {
+                r#type: INPUT_MOUSE,
+                Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 {
+                    mi: MOUSEINPUT {
+                        dx: abs_x,
+                        dy: abs_y,
+                        mouseData: 0,
+                        dwFlags: MOUSEEVENTF_LEFTUP | MOUSEEVENTF_ABSOLUTE,
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
+                },
+            },
+        ];
+
+        SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
+/// Mouse down at a specific screen position (for held notes)
+#[cfg(target_os = "windows")]
+pub fn mouse_down(x: i32, y: i32) {
+    use windows::Win32::UI::WindowsAndMessaging::GetSystemMetrics;
+    use windows::Win32::UI::WindowsAndMessaging::{SM_CXSCREEN, SM_CYSCREEN};
+
+    unsafe {
+        let screen_width = GetSystemMetrics(SM_CXSCREEN);
+        let screen_height = GetSystemMetrics(SM_CYSCREEN);
+
+        let abs_x = (x as i64 * 65536 / screen_width as i64) as i32;
+        let abs_y = (y as i64 * 65536 / screen_height as i64) as i32;
+
+        let inputs = [
+            INPUT {
+                r#type: INPUT_MOUSE,
+                Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 {
+                    mi: MOUSEINPUT {
+                        dx: abs_x,
+                        dy: abs_y,
+                        mouseData: 0,
+                        dwFlags: MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE,
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
+                },
+            },
+            INPUT {
+                r#type: INPUT_MOUSE,
+                Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 {
+                    mi: MOUSEINPUT {
+                        dx: abs_x,
+                        dy: abs_y,
+                        mouseData: 0,
+                        dwFlags: MOUSEEVENTF_LEFTDOWN | MOUSEEVENTF_ABSOLUTE,
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
+                },
+            },
+        ];
+
+        SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
+/// Mouse up (release click)
+#[cfg(target_os = "windows")]
+pub fn mouse_up() {
+    unsafe {
+        let inputs = [
+            INPUT {
+                r#type: INPUT_MOUSE,
+                Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 {
+                    mi: MOUSEINPUT {
+                        dx: 0,
+                        dy: 0,
+                        mouseData: 0,
+                        dwFlags: MOUSEEVENTF_LEFTUP,
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
+                },
+            },
+        ];
+
+        SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn mouse_click(_x: i32, _y: i32) {}
+
+#[cfg(not(target_os = "windows"))]
+pub fn mouse_down(_x: i32, _y: i32) {}
+
+#[cfg(not(target_os = "windows"))]
+pub fn mouse_up() {}

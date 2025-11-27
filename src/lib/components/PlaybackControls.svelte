@@ -20,7 +20,7 @@
     class="text-white/60 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
     on:click={playPrevious}
     disabled={!$isPlaying}
-    title="Previous (Ctrl+P)"
+    title="Previous (F10)"
   >
     <Icon icon="mdi:skip-previous" class="w-5 h-5" />
   </button>
@@ -43,7 +43,7 @@
     class="text-white/60 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
     on:click={playNext}
     disabled={!$isPlaying}
-    title="Next (Ctrl+N)"
+    title="Next (F11)"
   >
     <Icon icon="mdi:skip-next" class="w-5 h-5" />
   </button>

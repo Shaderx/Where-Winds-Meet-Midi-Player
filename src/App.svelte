@@ -12,6 +12,7 @@
   import PlaylistManager from "./lib/components/PlaylistManager.svelte";
   import FavoritesView from "./lib/components/FavoritesView.svelte";
   import SavedPlaylistsView from "./lib/components/SavedPlaylistsView.svelte";
+  import SettingsView from "./lib/components/SettingsView.svelte";
 
   import {
     loadMidiFiles,
@@ -34,7 +35,40 @@
     playPrevious,
     toggleLoop,
     toggleDraggable,
+    noteMode,
+    setNoteMode,
+    octaveShift,
+    setOctaveShift,
   } from "./lib/stores/player.js";
+
+  // Note mode options for quick selector
+  const noteModeOptions = [
+    { id: "Closest", short: "CLS", icon: "mdi:target", desc: "Best fit for most songs" },
+    { id: "Quantize", short: "QNT", icon: "mdi:grid", desc: "Snap to scale notes" },
+    { id: "TransposeOnly", short: "TRP", icon: "mdi:arrow-up-down", desc: "Direct octave shift" },
+    { id: "Pentatonic", short: "PEN", icon: "mdi:music", desc: "5-note scale mapping" },
+    { id: "Chromatic", short: "CHR", icon: "mdi:piano", desc: "12 to 7 key mapping" },
+    { id: "Raw", short: "RAW", icon: "mdi:code-braces", desc: "1:1 direct, no processing" },
+  ];
+
+  let showModeMenu = false;
+
+  function nextNoteMode() {
+    const currentIndex = noteModeOptions.findIndex(m => m.id === $noteMode);
+    const nextIndex = (currentIndex + 1) % noteModeOptions.length;
+    setNoteMode(noteModeOptions[nextIndex].id);
+  }
+
+  function prevNoteMode() {
+    const currentIndex = noteModeOptions.findIndex(m => m.id === $noteMode);
+    const prevIndex = (currentIndex - 1 + noteModeOptions.length) % noteModeOptions.length;
+    setNoteMode(noteModeOptions[prevIndex].id);
+  }
+
+  function selectNoteMode(modeId) {
+    setNoteMode(modeId);
+    showModeMenu = false;
+  }
 
   let activeView = "library"; // "library", "queue", "favorites", "playlists"
 
@@ -58,6 +92,7 @@
       label: "Playlists",
       badge: () => $savedPlaylists.length,
     },
+    { id: "settings", icon: "mdi:cog", label: "Settings" },
   ];
 
   const shortcuts = [
@@ -65,7 +100,7 @@
     { action: "Stop", key: "F12 / End" },
     { action: "Previous", key: "F10" },
     { action: "Next", key: "F11" },
-    { action: "Toggle Loop", key: "Ctrl + L" },
+    { action: "Mode", key: "[ / ]" },
   ];
 
   onMount(async () => {
@@ -92,6 +127,15 @@
           break;
         case "toggle_loop":
           await toggleLoop();
+          break;
+        case "mode_prev":
+          prevNoteMode();
+          break;
+        case "mode_next":
+          nextNoteMode();
+          break;
+        case "toggle_mini":
+          toggleMiniMode();
           break;
       }
     });
@@ -200,11 +244,10 @@
             </div>
 
             <!-- Logo / Title -->
-            <div class="px-3 py-2 mb-2 -mt-2">
-              <h1 class="text-lg font-bold text-white/90">MIDI Automation</h1>
-              <!-- <p class="text-xs text-white/40">MIDI Automation</p> -->
-              <p class="text-xs text-white/40">By YueLyn</p>
-            </div>
+            <!-- <div class="px-3 py-2 mb-2 -mt-2"> -->
+            <!-- <h1 class="text-lg font-bold text-white/90">WWM Overlay</h1> -->
+            <!-- <p class="text-xs text-white/40">By YueLyn</p> -->
+            <!-- </div> -->
 
             <!-- Navigation -->
             <nav class="flex flex-col gap-1">
@@ -248,15 +291,16 @@
             <div class="flex-1"></div>
 
             <!-- Refresh Button -->
-            <button
+            <!-- <button
               class="flex items-center gap-2 px-3 py-2 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-all w-full"
               onclick={loadMidiFiles}
               title="Refresh library"
             >
               <Icon icon="mdi:refresh" class="w-5 h-5" />
               <span class="font-medium text-sm">Refresh</span>
-            </button>
+            </button> -->
 
+            <p class="text-xs text-white/40 px-3">By YueLyn</p>
             <!-- Keyboard Shortcuts Info -->
             <div class="px-3 py-3 bg-white/5 rounded-lg mt-2">
               <p
@@ -266,7 +310,7 @@
                 Shortcuts
               </p>
               <div class="space-y-1">
-                {#each shortcuts.slice(0, 3) as shortcut}
+                {#each shortcuts.slice(0, 4) as shortcut}
                   <div class="flex justify-between text-xs">
                     <span class="text-white/40">{shortcut.action}</span>
                     <span class="text-white/60 font-mono"
@@ -300,6 +344,8 @@
                     <FavoritesView />
                   {:else if activeView === "playlists"}
                     <SavedPlaylistsView />
+                  {:else if activeView === "settings"}
+                    <SettingsView />
                   {/if}
                 </div>
               {/key}
@@ -344,6 +390,79 @@
 
           <!-- Right Controls -->
           <div class="flex items-center gap-2 w-64 justify-end">
+            <!-- Octave Shift Control -->
+            <div class="flex items-center gap-1 bg-white/5 rounded-md px-1.5 py-0.5">
+              <button
+                class="w-5 h-5 flex items-center justify-center rounded text-white/50 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                onclick={() => setOctaveShift($octaveShift - 1)}
+                disabled={$octaveShift <= -2}
+                title="Lower octave"
+              >
+                <Icon icon="mdi:minus" class="w-3.5 h-3.5" />
+              </button>
+              <span
+                class="text-xs font-mono w-8 text-center {$octaveShift === 0 ? 'text-white/50' : $octaveShift > 0 ? 'text-[#1db954]' : 'text-orange-400'}"
+                title="Octave shift ({$octaveShift > 0 ? '+' : ''}{$octaveShift * 12} semitones)"
+              >
+                {$octaveShift > 0 ? '+' : ''}{$octaveShift}
+              </span>
+              <button
+                class="w-5 h-5 flex items-center justify-center rounded text-white/50 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                onclick={() => setOctaveShift($octaveShift + 1)}
+                disabled={$octaveShift >= 2}
+                title="Higher octave"
+              >
+                <Icon icon="mdi:plus" class="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <!-- Note Mode Quick Selector -->
+            <div class="relative">
+              <button
+                class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 transition-colors text-white/70 hover:text-white text-xs font-medium"
+                onclick={() => showModeMenu = !showModeMenu}
+                title="Note calculation mode (click to change)"
+              >
+                <Icon icon={noteModeOptions.find(m => m.id === $noteMode)?.icon || "mdi:music-note"} class="w-3.5 h-3.5" />
+                <span>{noteModeOptions.find(m => m.id === $noteMode)?.short || "CLS"}</span>
+                <Icon icon="mdi:chevron-down" class="w-3 h-3 opacity-50" />
+              </button>
+
+              {#if showModeMenu}
+                <!-- Backdrop to close menu -->
+                <button
+                  class="fixed inset-0 z-40"
+                  onclick={() => showModeMenu = false}
+                  aria-label="Close menu"
+                ></button>
+
+                <!-- Dropdown Menu -->
+                <div
+                  class="absolute bottom-full right-0 mb-2 bg-[#282828] rounded-lg shadow-xl border border-white/10 overflow-hidden z-50 min-w-[200px]"
+                  in:fly={{ y: 10, duration: 150 }}
+                  out:fade={{ duration: 100 }}
+                >
+                  <div class="py-1">
+                    {#each noteModeOptions as mode}
+                      <button
+                        class="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors {$noteMode === mode.id ? 'bg-[#1db954]/20' : 'hover:bg-white/5'}"
+                        onclick={() => selectNoteMode(mode.id)}
+                      >
+                        <Icon icon={mode.icon} class="w-4 h-4 flex-shrink-0 {$noteMode === mode.id ? 'text-[#1db954]' : 'text-white/50'}" />
+                        <div class="flex-1 min-w-0">
+                          <div class="text-sm font-medium {$noteMode === mode.id ? 'text-[#1db954]' : 'text-white/90'}">{mode.id}</div>
+                          <div class="text-xs {$noteMode === mode.id ? 'text-[#1db954]/70' : 'text-white/40'}">{mode.desc}</div>
+                        </div>
+                        {#if $noteMode === mode.id}
+                          <Icon icon="mdi:check" class="w-4 h-4 text-[#1db954] flex-shrink-0" />
+                        {/if}
+                      </button>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
+            </div>
+
             <button
               class="spotify-icon-button transition-all duration-200 {$loopMode
                 ? 'text-[#1db954] bg-[#1db954]/10'

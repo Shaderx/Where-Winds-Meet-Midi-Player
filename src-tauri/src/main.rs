@@ -5,7 +5,7 @@ use std::thread;
 use tauri::{AppHandle, Emitter, State, Window};
 use serde::{Serialize, Deserialize};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    RegisterHotKey, MOD_CONTROL, MOD_NOREPEAT, VK_END, VK_F9, VK_F10, VK_F11, VK_F12,
+    RegisterHotKey, MOD_NOREPEAT, VK_END, VK_F9, VK_F10, VK_F11, VK_F12,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     GetMessageW, SetWindowsHookExW, CallNextHookEx, TranslateMessage, DispatchMessageW,
@@ -35,9 +35,6 @@ const HOTKEY_STOP_END: i32 = 2;
 const HOTKEY_STOP_F12: i32 = 3;
 const HOTKEY_PREV_F10: i32 = 4;
 const HOTKEY_NEXT_F11: i32 = 5;
-const HOTKEY_PREV_CTRL_P: i32 = 6;
-const HOTKEY_NEXT_CTRL_N: i32 = 7;
-const HOTKEY_LOOP_CTRL_L: i32 = 8;
 
 // Load MIDI files from album folder
 #[tauri::command]
@@ -132,8 +129,64 @@ async fn set_loop_mode(
 }
 
 #[tauri::command]
+async fn set_note_mode(
+    mode: midi::NoteMode,
+    state: State<'_, Arc<Mutex<AppState>>>
+) -> Result<(), String> {
+    let mut app_state = state.lock().unwrap();
+    app_state.set_note_mode(mode);
+    println!("Note mode set to: {:?}", mode);
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_note_mode(
+    state: State<'_, Arc<Mutex<AppState>>>
+) -> Result<midi::NoteMode, String> {
+    let app_state = state.lock().unwrap();
+    Ok(app_state.get_note_mode())
+}
+
+#[tauri::command]
+async fn set_octave_shift(
+    shift: i8,
+    state: State<'_, Arc<Mutex<AppState>>>
+) -> Result<(), String> {
+    let mut app_state = state.lock().unwrap();
+    app_state.set_octave_shift(shift);
+    println!("Octave shift set to: {}", shift);
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_octave_shift(
+    state: State<'_, Arc<Mutex<AppState>>>
+) -> Result<i8, String> {
+    let app_state = state.lock().unwrap();
+    Ok(app_state.get_octave_shift())
+}
+
+#[tauri::command]
 async fn is_game_focused() -> Result<bool, String> {
     keyboard::is_black_desert_focused().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn test_all_keys() -> Result<(), String> {
+    // Focus game window first
+    let _ = keyboard::focus_black_desert_window();
+    std::thread::sleep(std::time::Duration::from_millis(500));
+
+    // Test all 21 keys: Low (Z-M), Mid (A-J), High (Q-U)
+    let keys = ["z", "x", "c", "v", "b", "n", "m", "a", "s", "d", "f", "g", "h", "j", "q", "w", "e", "r", "t", "y", "u"];
+    for key in keys {
+        keyboard::key_down(key);
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        keyboard::key_up(key);
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -205,6 +258,7 @@ async fn seek(
     Ok(())
 }
 
+
 fn register_global_hotkeys() -> Vec<(&'static str, bool)> {
     let mut results = Vec::new();
 
@@ -228,24 +282,17 @@ fn register_global_hotkeys() -> Vec<(&'static str, bool)> {
         // F11 - Next
         let result = RegisterHotKey(None, HOTKEY_NEXT_F11, MOD_NOREPEAT, VK_F11.0 as u32);
         results.push(("F11 (Next)", result.is_ok()));
-
-        // Ctrl+P - Previous
-        let result = RegisterHotKey(None, HOTKEY_PREV_CTRL_P, MOD_CONTROL | MOD_NOREPEAT, 0x50);
-        results.push(("Ctrl+P (Previous)", result.is_ok()));
-
-        // Ctrl+N - Next
-        let result = RegisterHotKey(None, HOTKEY_NEXT_CTRL_N, MOD_CONTROL | MOD_NOREPEAT, 0x4E);
-        results.push(("Ctrl+N (Next)", result.is_ok()));
-
-        // Ctrl+L - Loop
-        let result = RegisterHotKey(None, HOTKEY_LOOP_CTRL_L, MOD_CONTROL | MOD_NOREPEAT, 0x4C);
-        results.push(("Ctrl+L (Loop)", result.is_ok()));
     }
 
     results
 }
 
-// Low-level keyboard hook callback for F12 (since RegisterHotKey often fails for F12)
+// Virtual key codes for [ and ]
+const VK_OEM_4: u32 = 0xDB; // [ key
+const VK_OEM_6: u32 = 0xDD; // ] key
+const VK_INSERT: u32 = 0x2D; // Insert key
+
+// Low-level keyboard hook callback for F12, mode switching, and mini mode
 unsafe extern "system" fn low_level_keyboard_proc(
     ncode: i32,
     wparam: windows::Win32::Foundation::WPARAM,
@@ -255,10 +302,24 @@ unsafe extern "system" fn low_level_keyboard_proc(
         let kb_struct = &*(lparam.0 as *const KBDLLHOOKSTRUCT);
         let is_keydown = wparam.0 as u32 == WM_KEYDOWN || wparam.0 as u32 == WM_SYSKEYDOWN;
 
-        // Check if F12 was pressed
-        if is_keydown && kb_struct.vkCode == VK_F12.0 as u32 {
+        if is_keydown {
             if let Some(ref app_handle) = GLOBAL_APP_HANDLE {
-                let _ = app_handle.emit("global-shortcut", "stop");
+                // Check if F12 was pressed
+                if kb_struct.vkCode == VK_F12.0 as u32 {
+                    let _ = app_handle.emit("global-shortcut", "stop");
+                }
+                // Check if [ was pressed - previous mode
+                else if kb_struct.vkCode == VK_OEM_4 {
+                    let _ = app_handle.emit("global-shortcut", "mode_prev");
+                }
+                // Check if ] was pressed - next mode
+                else if kb_struct.vkCode == VK_OEM_6 {
+                    let _ = app_handle.emit("global-shortcut", "mode_next");
+                }
+                // Check if Insert was pressed - toggle mini mode
+                else if kb_struct.vkCode == VK_INSERT {
+                    let _ = app_handle.emit("global-shortcut", "toggle_mini");
+                }
             }
         }
     }
@@ -327,9 +388,8 @@ fn start_hotkey_listener(app_handle: AppHandle) {
                     let action = match hotkey_id {
                         HOTKEY_PAUSE_RESUME => "pause_resume",
                         HOTKEY_STOP_END | HOTKEY_STOP_F12 => "stop",
-                        HOTKEY_PREV_F10 | HOTKEY_PREV_CTRL_P => "previous",
-                        HOTKEY_NEXT_F11 | HOTKEY_NEXT_CTRL_N => "next",
-                        HOTKEY_LOOP_CTRL_L => "toggle_loop",
+                        HOTKEY_PREV_F10 => "previous",
+                        HOTKEY_NEXT_F11 => "next",
                         _ => continue,
                     };
 
@@ -361,7 +421,12 @@ fn main() {
             stop_playback,
             get_playback_status,
             set_loop_mode,
+            set_note_mode,
+            get_note_mode,
+            set_octave_shift,
+            get_octave_shift,
             is_game_focused,
+            test_all_keys,
             set_interaction_mode,
             focus_game_window,
             seek,

@@ -1,8 +1,35 @@
 use midly::{Smf, TrackEventKind, MidiMessage};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::{Window, Emitter};
+use serde::{Serialize, Deserialize};
+
+/// Note calculation mode - how MIDI notes are mapped to game keys
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(u8)]
+pub enum NoteMode {
+    Closest = 0,      // Find closest available note (original behavior)
+    Quantize = 1,     // Snap to exact scale notes only
+    TransposeOnly = 2, // Just shift octaves, direct mapping
+    Pentatonic = 3,   // Map to pentatonic scale (5 notes)
+    Chromatic = 4,    // Detailed chromatic mapping
+    Raw = 5,          // Raw 1:1 mapping, no transpose
+}
+
+impl From<u8> for NoteMode {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => NoteMode::Closest,
+            1 => NoteMode::Quantize,
+            2 => NoteMode::TransposeOnly,
+            3 => NoteMode::Pentatonic,
+            4 => NoteMode::Chromatic,
+            5 => NoteMode::Raw,
+            _ => NoteMode::Closest,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct MidiData {
@@ -24,10 +51,11 @@ pub enum EventType {
     NoteOff,
 }
 
-// Key layout configuration - matching Python implementation
+// 21-key mode: Basic keys for 3 octaves (7 notes each)
 const LOW_KEYS: [&str; 7] = ["z", "x", "c", "v", "b", "n", "m"];
 const MID_KEYS: [&str; 7] = ["a", "s", "d", "f", "g", "h", "j"];
 const HIGH_KEYS: [&str; 7] = ["q", "w", "e", "r", "t", "y", "u"];
+
 
 const SCALE_INTERVALS: [i32; 7] = [0, 2, 4, 5, 7, 9, 11];
 const ROOT_NOTE: i32 = 60; // C4
@@ -263,6 +291,7 @@ fn normalize_into_range(note: i32) -> i32 {
     normalized
 }
 
+
 fn note_to_key(note: i32, transpose: i32) -> String {
     let target = normalize_into_range(note + transpose);
     let instrument_notes = get_instrument_notes();
@@ -295,16 +324,195 @@ fn note_to_key(note: i32, transpose: i32) -> String {
     key
 }
 
+/// Quantize mode - snap to exact scale notes only (no in-between approximation)
+fn note_to_key_quantize(note: i32, transpose: i32) -> String {
+    let target = note + transpose;
+    let instrument_notes = get_instrument_notes();
+    let lo = instrument_notes[0];
+    let hi = instrument_notes[instrument_notes.len() - 1];
+
+    // Normalize to range
+    let mut normalized = target;
+    while normalized < lo {
+        normalized += 12;
+    }
+    while normalized > hi {
+        normalized -= 12;
+    }
+
+    // Find exact match or closest scale note
+    let mut best_idx = 0;
+    let mut best_dist = i32::MAX;
+
+    for (i, &inst_note) in instrument_notes.iter().enumerate() {
+        let dist = (inst_note - normalized).abs();
+        if dist < best_dist {
+            best_idx = i;
+            best_dist = dist;
+        }
+    }
+
+    // Only play if it's an exact match or very close (within 1 semitone)
+    if best_dist > 1 {
+        // Skip notes that don't fit the scale well - map to nearest
+        best_idx = best_idx;
+    }
+
+    let all_keys = [LOW_KEYS.as_slice(), MID_KEYS.as_slice(), HIGH_KEYS.as_slice()].concat();
+    all_keys[best_idx].to_string()
+}
+
+/// Transpose Only mode - direct semitone to key mapping within octave
+fn note_to_key_transpose(note: i32, transpose: i32) -> String {
+    let target = note + transpose;
+
+    // Get semitone within octave (0-11)
+    let semitone = ((target - ROOT_NOTE) % 12 + 12) % 12;
+
+    // Determine octave
+    let octave_offset = (target - ROOT_NOTE) / 12;
+    let octave = (1 + octave_offset).clamp(0, 2) as usize;
+
+    // Direct mapping: semitone 0-11 to key 0-6 (wrap around)
+    // This gives a more "raw" feel
+    let key_idx = (semitone * 7 / 12) as usize;
+
+    match octave {
+        0 => LOW_KEYS[key_idx].to_string(),
+        1 => MID_KEYS[key_idx].to_string(),
+        _ => HIGH_KEYS[key_idx].to_string(),
+    }
+}
+
+/// Pentatonic mode - map to pentatonic scale (5 notes per octave)
+/// Pentatonic: C, D, E, G, A (indices 0, 1, 2, 4, 5 in our 7-note scale)
+fn note_to_key_pentatonic(note: i32, transpose: i32) -> String {
+    let target = note + transpose;
+
+    // Pentatonic intervals from root: 0, 2, 4, 7, 9 (C, D, E, G, A)
+    const PENTA_INTERVALS: [i32; 5] = [0, 2, 4, 7, 9];
+    const PENTA_KEY_IDX: [usize; 5] = [0, 1, 2, 4, 5]; // Map to do, re, mi, so, la
+
+    // Normalize to range
+    let instrument_notes = get_instrument_notes();
+    let lo = instrument_notes[0];
+    let hi = instrument_notes[instrument_notes.len() - 1];
+
+    let mut normalized = target;
+    while normalized < lo {
+        normalized += 12;
+    }
+    while normalized > hi {
+        normalized -= 12;
+    }
+
+    // Get semitone within octave
+    let semitone = ((normalized - ROOT_NOTE) % 12 + 12) % 12;
+
+    // Determine octave
+    let octave = if normalized < ROOT_NOTE {
+        0
+    } else if normalized < ROOT_NOTE + 12 {
+        1
+    } else {
+        2
+    };
+
+    // Find closest pentatonic note
+    let mut best_penta_idx = 0;
+    let mut best_dist = i32::MAX;
+    for (i, &interval) in PENTA_INTERVALS.iter().enumerate() {
+        let dist = (interval - semitone).abs().min((interval - semitone + 12).abs()).min((interval - semitone - 12).abs());
+        if dist < best_dist {
+            best_dist = dist;
+            best_penta_idx = i;
+        }
+    }
+
+    let key_idx = PENTA_KEY_IDX[best_penta_idx];
+
+    match octave {
+        0 => LOW_KEYS[key_idx].to_string(),
+        1 => MID_KEYS[key_idx].to_string(),
+        _ => HIGH_KEYS[key_idx].to_string(),
+    }
+}
+
+/// Chromatic mode - detailed mapping of all 12 semitones to closest natural key
+fn note_to_key_chromatic(note: i32, transpose: i32) -> String {
+    let target = note + transpose;
+
+    // Normalize into our 3-octave range
+    let instrument_notes = get_instrument_notes();
+    let lo = instrument_notes[0];
+    let hi = instrument_notes[instrument_notes.len() - 1];
+
+    let mut normalized = target;
+    while normalized < lo {
+        normalized += 12;
+    }
+    while normalized > hi {
+        normalized -= 12;
+    }
+
+    // Get semitone within octave (0-11)
+    let semitone_in_octave = ((normalized - ROOT_NOTE) % 12 + 12) % 12;
+
+    // Determine which octave we're in
+    let octave = if normalized < ROOT_NOTE {
+        0 // Low
+    } else if normalized < ROOT_NOTE + 12 {
+        1 // Mid
+    } else {
+        2 // High
+    };
+
+    // Map each chromatic semitone to closest natural key (0-6)
+    // Semitone: 0=C, 1=C#, 2=D, 3=Eb, 4=E, 5=F, 6=F#, 7=G, 8=G#, 9=A, 10=Bb, 11=B
+    let key_idx = match semitone_in_octave {
+        0 => 0,   // C -> do
+        1 => 0,   // C# -> do
+        2 => 1,   // D -> re
+        3 => 2,   // Eb -> mi
+        4 => 2,   // E -> mi
+        5 => 3,   // F -> fa
+        6 => 3,   // F# -> fa
+        7 => 4,   // G -> so
+        8 => 4,   // G# -> so
+        9 => 5,   // A -> la
+        10 => 6,  // Bb -> ti
+        11 => 6,  // B -> ti
+        _ => 0,
+    };
+
+    match octave {
+        0 => LOW_KEYS[key_idx].to_string(),
+        1 => MID_KEYS[key_idx].to_string(),
+        _ => HIGH_KEYS[key_idx].to_string(),
+    }
+}
+
+/// Raw mode - direct 1:1 mapping, no transpose, no processing
+/// MIDI note modulo 21 maps directly to one of 21 keys
+fn note_to_key_raw(note: i32) -> String {
+    // Direct mapping: note % 21 gives key index 0-20
+    let key_idx = ((note % 21) + 21) % 21; // Handle negative notes
+    let all_keys = [LOW_KEYS.as_slice(), MID_KEYS.as_slice(), HIGH_KEYS.as_slice()].concat();
+    all_keys[key_idx as usize].to_string()
+}
+
+
 pub fn play_midi(
     midi_data: MidiData,
     is_playing: Arc<AtomicBool>,
     is_paused: Arc<AtomicBool>,
     loop_mode: Arc<AtomicBool>,
+    note_mode: Arc<AtomicU8>,
+    octave_shift: Arc<std::sync::atomic::AtomicI8>,
     current_position: Arc<std::sync::Mutex<f64>>,
     seek_offset: Arc<std::sync::Mutex<f64>>,
     window: Window,
 ) {
-    // Get the seek offset
     let offset_ms = (*seek_offset.lock().unwrap() * 1000.0) as u64;
 
     // Spawn a separate thread for progress updates
@@ -319,71 +527,61 @@ pub fn play_midi(
                 let position = *current_position_progress.lock().unwrap();
                 let _ = window_progress.emit("playback-progress", position);
             }
-            std::thread::sleep(Duration::from_millis(100)); // Update 10 times per second
+            std::thread::sleep(Duration::from_millis(100));
         }
     });
 
     loop {
         let start_time = Instant::now();
+        // Track which key is pressed for each MIDI note (note -> key that was pressed)
+        let mut note_to_pressed_key: std::collections::HashMap<u8, String> = std::collections::HashMap::new();
+        // Track reference count for each key (multiple notes might map to same key)
         let mut key_active_count: std::collections::HashMap<String, i32> = std::collections::HashMap::new();
         let mut total_paused_duration = Duration::ZERO;
 
+        // Helper to release all keys
+        let release_all_keys = |key_active_count: &std::collections::HashMap<String, i32>| {
+            for (key, count) in key_active_count {
+                if *count > 0 {
+                    crate::keyboard::key_up(key);
+                }
+            }
+        };
+
         for event in &midi_data.events {
-            // Skip events before the seek offset
             if event.time_ms < offset_ms {
                 continue;
             }
 
-            // Check if we should stop
             if !is_playing.load(Ordering::SeqCst) {
-                // Release all pressed keys
-                for (key, count) in &key_active_count {
-                    if *count > 0 {
-                        crate::keyboard::key_up(key);
-                    }
-                }
+                release_all_keys(&key_active_count);
                 return;
             }
 
-            // Target time for this event (relative to playback start, minus offset)
             let target_time = Duration::from_millis(event.time_ms - offset_ms);
 
-            // Wait until we reach the event time, handling pause properly
+            // Wait until we reach the event time
             loop {
-                // Check if we should stop
                 if !is_playing.load(Ordering::SeqCst) {
-                    for (key, count) in &key_active_count {
-                        if *count > 0 {
-                            crate::keyboard::key_up(key);
-                        }
-                    }
+                    release_all_keys(&key_active_count);
                     return;
                 }
 
-                // Handle pause - track how long we're paused
                 if is_paused.load(Ordering::SeqCst) {
                     let pause_start = Instant::now();
                     while is_paused.load(Ordering::SeqCst) && is_playing.load(Ordering::SeqCst) {
                         std::thread::sleep(Duration::from_millis(50));
                         if !is_playing.load(Ordering::SeqCst) {
-                            for (key, count) in &key_active_count {
-                                if *count > 0 {
-                                    crate::keyboard::key_up(key);
-                                }
-                            }
+                            release_all_keys(&key_active_count);
                             return;
                         }
                     }
                     total_paused_duration += pause_start.elapsed();
                 }
 
-                // Calculate effective elapsed time (excluding paused time)
                 let effective_elapsed = start_time.elapsed().saturating_sub(total_paused_duration);
-
-                // Update current position
                 *current_position.lock().unwrap() = effective_elapsed.as_secs_f64() + (offset_ms as f64 / 1000.0);
 
-                // Check if we've reached the target time
                 if effective_elapsed >= target_time {
                     break;
                 }
@@ -391,13 +589,24 @@ pub fn play_midi(
                 std::thread::sleep(Duration::from_millis(1));
             }
 
-            // Progress updates are now handled by the separate progress thread
-
-            // Process the event
-            let key = note_to_key(event.note as i32, midi_data.transpose);
+            // Get key based on note calculation mode (read in realtime for live switching)
+            let current_mode = NoteMode::from(note_mode.load(Ordering::SeqCst));
+            // Get octave shift in semitones (1 octave = 12 semitones)
+            let shift_semitones = octave_shift.load(Ordering::SeqCst) as i32 * 12;
+            let total_transpose = midi_data.transpose + shift_semitones;
+            let key = match current_mode {
+                NoteMode::Closest => note_to_key(event.note as i32, total_transpose),
+                NoteMode::Quantize => note_to_key_quantize(event.note as i32, total_transpose),
+                NoteMode::TransposeOnly => note_to_key_transpose(event.note as i32, total_transpose),
+                NoteMode::Pentatonic => note_to_key_pentatonic(event.note as i32, total_transpose),
+                NoteMode::Chromatic => note_to_key_chromatic(event.note as i32, total_transpose),
+                NoteMode::Raw => note_to_key_raw(event.note as i32 + shift_semitones), // Raw ignores auto-transpose, only uses manual shift
+            };
 
             match event.event_type {
                 EventType::NoteOn => {
+                    // Store which key we're pressing for this MIDI note
+                    note_to_pressed_key.insert(event.note, key.clone());
                     let count = key_active_count.entry(key.clone()).or_insert(0);
                     if *count == 0 {
                         crate::keyboard::key_down(&key);
@@ -405,11 +614,14 @@ pub fn play_midi(
                     *count += 1;
                 }
                 EventType::NoteOff => {
-                    if let Some(count) = key_active_count.get_mut(&key) {
-                        if *count > 0 {
-                            *count -= 1;
-                            if *count == 0 {
-                                crate::keyboard::key_up(&key);
+                    // Use the key that was actually pressed for this note, not current mode mapping
+                    if let Some(pressed_key) = note_to_pressed_key.remove(&event.note) {
+                        if let Some(count) = key_active_count.get_mut(&pressed_key) {
+                            if *count > 0 {
+                                *count -= 1;
+                                if *count == 0 {
+                                    crate::keyboard::key_up(&pressed_key);
+                                }
                             }
                         }
                     }
@@ -418,18 +630,12 @@ pub fn play_midi(
         }
 
         // Release all remaining keys
-        for (key, count) in &key_active_count {
-            if *count > 0 {
-                crate::keyboard::key_up(key);
-            }
-        }
+        release_all_keys(&key_active_count);
 
-        // Check if we should loop
         if !loop_mode.load(Ordering::SeqCst) {
             break;
         }
 
-        // Small delay before looping
         std::thread::sleep(Duration::from_millis(500));
     }
 

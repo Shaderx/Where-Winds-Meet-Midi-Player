@@ -1,8 +1,10 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicI8, Ordering};
 use std::time::Instant;
 use tauri::Window;
 use serde::{Serialize, Deserialize};
+
+use crate::midi::NoteMode;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlaybackState {
@@ -12,12 +14,16 @@ pub struct PlaybackState {
     pub total_duration: f64,
     pub current_file: Option<String>,
     pub loop_mode: bool,
+    pub note_mode: NoteMode,
+    pub octave_shift: i8,
 }
 
 pub struct AppState {
     is_playing: Arc<AtomicBool>,
     is_paused: Arc<AtomicBool>,
     loop_mode: Arc<AtomicBool>,
+    note_mode: Arc<AtomicU8>,
+    octave_shift: Arc<AtomicI8>,
     current_position: Arc<std::sync::Mutex<f64>>,
     total_duration: Arc<std::sync::Mutex<f64>>,
     current_file: Arc<std::sync::Mutex<Option<String>>>,
@@ -32,6 +38,8 @@ impl AppState {
             is_playing: Arc::new(AtomicBool::new(false)),
             is_paused: Arc::new(AtomicBool::new(false)),
             loop_mode: Arc::new(AtomicBool::new(false)),
+            note_mode: Arc::new(AtomicU8::new(NoteMode::Closest as u8)),
+            octave_shift: Arc::new(AtomicI8::new(0)),
             current_position: Arc::new(std::sync::Mutex::new(0.0)),
             total_duration: Arc::new(std::sync::Mutex::new(0.0)),
             current_file: Arc::new(std::sync::Mutex::new(None)),
@@ -63,6 +71,8 @@ impl AppState {
             let is_playing = Arc::clone(&self.is_playing);
             let is_paused = Arc::clone(&self.is_paused);
             let loop_mode = Arc::clone(&self.loop_mode);
+            let note_mode = Arc::clone(&self.note_mode);
+            let octave_shift = Arc::clone(&self.octave_shift);
             let current_position = Arc::clone(&self.current_position);
             let seek_offset = Arc::clone(&self.seek_offset);
 
@@ -72,6 +82,8 @@ impl AppState {
                     is_playing,
                     is_paused,
                     loop_mode,
+                    note_mode,
+                    octave_shift,
                     current_position,
                     seek_offset,
                     window
@@ -82,6 +94,24 @@ impl AppState {
         } else {
             Err("No MIDI file loaded".to_string())
         }
+    }
+
+    pub fn set_note_mode(&mut self, mode: NoteMode) {
+        self.note_mode.store(mode as u8, Ordering::SeqCst);
+    }
+
+    pub fn get_note_mode(&self) -> NoteMode {
+        NoteMode::from(self.note_mode.load(Ordering::SeqCst))
+    }
+
+    pub fn set_octave_shift(&mut self, shift: i8) {
+        // Clamp to -2 to +2 octaves
+        let clamped = shift.clamp(-2, 2);
+        self.octave_shift.store(clamped, Ordering::SeqCst);
+    }
+
+    pub fn get_octave_shift(&self) -> i8 {
+        self.octave_shift.load(Ordering::SeqCst)
     }
 
     pub fn toggle_pause(&mut self) {
@@ -138,6 +168,8 @@ impl AppState {
             total_duration: *self.total_duration.lock().unwrap(),
             current_file: self.current_file.lock().unwrap().clone(),
             loop_mode: self.loop_mode.load(Ordering::SeqCst),
+            note_mode: self.get_note_mode(),
+            octave_shift: self.get_octave_shift(),
         }
     }
 }

@@ -1,9 +1,16 @@
 # WWM Overlay - MIDI Music Player (21 Keys)
 A beautiful music player for Where Winds Meet that plays your MIDI files by automatically pressing the right keyboard keys in-game.
 
-<img width="1125" height="620" alt="Screenshot 2025-11-25 105732" src="https://github.com/user-attachments/assets/3884a12e-3950-410a-b48d-44756581b159" />
+<img width="1180" height="560" alt="image" src="https://github.com/user-attachments/assets/eb5553e1-ef46-48e3-8543-f75929a79fec" />
 
-https://github.com/user-attachments/assets/af8d0f3d-3985-4db3-b6cf-bea16f4cb2b2
+https://github.com/user-attachments/assets/4d25e203-0e4f-4b0f-8dc4-e855ce5e6647
+
+### Mini Mode
+
+Collapse the app to a small floating icon while playing. The icon glows green when music is playing. Press `Insert` to toggle, or click the minimize button in the sidebar.
+
+<img width="64" height="89" alt="Mini mode icon" src="https://github.com/user-attachments/assets/f0de318f-6a1a-4e92-93c8-ba73b42d4d13" />
+
 
 
 ## What is this?
@@ -15,12 +22,16 @@ This app lets you play music in Where Winds Meet's music minigame! Just add your
 - **Beautiful Spotify-style interface** - Dark theme with smooth animations
 - **Easy to use** - Just drag your MIDI files and click play
 - **Smart music selection** - Automatically adjusts notes to fit the game's instrument
+- **Multiple note modes** - 6 different note calculation algorithms to choose from
+- **Real-time mode switching** - Change note mode during playback instantly
+- **Octave shift control** - Adjust pitch up or down by up to 2 octaves
 - **Queue system** - Build your playlist and play songs in order
 - **Favorites** - Mark your favorite songs for quick access
 - **Multiple playlists** - Create, rename, and manage custom playlists
 - **Drag & drop reordering** - Reorder songs in queue and playlists
 - **Real-time progress** - See exactly where you are in the song
 - **Global hotkeys** - Control playback from anywhere, even when the game is focused
+- **Mini mode** - Collapse to a small floating icon while playing
 - **Song duration display** - See how long each MIDI file is
 
 ## How to Use
@@ -52,9 +63,24 @@ These shortcuts work even when the game is focused:
 | **F11** | Next track |
 | **F12** | Stop |
 | **End** | Stop (alternative) |
-| **Ctrl+L** | Toggle loop mode |
-| **Ctrl+P** | Previous track (alternative) |
-| **Ctrl+N** | Next track (alternative) |
+| **[** | Previous note mode |
+| **]** | Next note mode |
+| **Insert** | Toggle mini mode |
+
+### Note Calculation Modes
+
+The app offers 6 different algorithms for mapping MIDI notes to the game's 21 keys:
+
+| Mode | Description |
+|------|-------------|
+| **Closest** | Finds the closest available note (default, best for most songs) |
+| **Quantize** | Snaps to exact scale notes only |
+| **Transpose Only** | Direct mapping with octave shifting |
+| **Pentatonic** | Maps to 5-note pentatonic scale (do-re-mi-so-la) |
+| **Chromatic** | Detailed 12-semitone to 7-key mapping |
+| **Raw** | Direct 1:1 mapping, no processing (MIDI note % 21) |
+
+You can change modes in real-time during playback using the `[` and `]` keys or the mode selector in the bottom bar.
 
 ### In-App Controls
 
@@ -64,6 +90,9 @@ These shortcuts work even when the game is focused:
 - **Drag handle** (top of sidebar) - Move the window around
 - **Play/Pause button** - Control playback at the bottom
 - **Loop button** - Toggle repeat mode
+- **Octave shift** (+/-) - Adjust pitch up or down (bottom bar)
+- **Mode selector** - Quick access to note calculation modes (bottom bar)
+- **Minimize button** - Collapse to mini mode (floating icon)
 
 ### Managing Playlists
 
@@ -79,10 +108,12 @@ These shortcuts work even when the game is focused:
 ### Tips
 
 - **Finding MIDI files**: Search online for "song name midi" or "song name .mid"
-- **Song not playing right?**: The app automatically adjusts the notes, but some complex songs might not work well with the game's limited keyboard layout
+- **Song not playing right?**: Try different note modes! Press `[` or `]` to cycle through modes while playing
+- **Too high or too low?**: Use the octave shift controls (+/-) in the bottom bar to adjust pitch
 - **Multiple songs**: Add multiple songs to your queue for a continuous playlist
 - **Searching**: Use the search box to quickly find songs in your library
 - **Favorites**: Click the heart icon to quickly access your favorite songs later
+- **Mini mode**: Press `Insert` to collapse the app while playing, press again to expand
 
 ## Troubleshooting
 
@@ -98,7 +129,8 @@ These shortcuts work even when the game is focused:
 
 **Music sounds wrong**
 - The game only has 21 keys (3 octaves), so some complex songs won't sound perfect
-- The app tries its best to fit the notes into the available range
+- Try different note modes by pressing `[` or `]` - some modes work better for certain songs
+- Use octave shift (+/-) if the song sounds too high or too low
 - Try different MIDI files to see what works best
 
 **Songs not showing up**
