@@ -2,8 +2,8 @@
 A beautiful music player for Where Winds Meet that plays your MIDI files by automatically pressing the right keyboard keys in-game.
 
 > **Note:** 36-key mode is currently unstable and experimental. We're looking for a better approach. For best results, use the default 21-key mode.
+<img width="1180" height="560" alt="image" src="https://github.com/user-attachments/assets/63a05a45-b852-4b03-9c94-2432b78a4c2f" />
 
-<img width="1180" height="560" alt="image" src="https://github.com/user-attachments/assets/eb5553e1-ef46-48e3-8543-f75929a79fec" />
 
 https://github.com/user-attachments/assets/4d25e203-0e4f-4b0f-8dc4-e855ce5e6647
 
