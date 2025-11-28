@@ -70,11 +70,11 @@ export async function toggleMiniMode() {
   } else {
     // Exiting mini mode - restore previous state
     try {
-      await appWindow.setMinSize(new LogicalSize(960, 480));
+      await appWindow.setMinSize(new LogicalSize(960, 540));
       if (previousWindowState) {
         await appWindow.setSize(new LogicalSize(previousWindowState.width, previousWindowState.height));
       } else {
-        await appWindow.setSize(new LogicalSize(1180, 560));
+        await appWindow.setSize(new LogicalSize(1180, 620));
       }
     } catch (error) {
       console.error('Failed to restore window from mini mode:', error);

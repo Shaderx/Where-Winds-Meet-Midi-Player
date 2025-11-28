@@ -19,6 +19,12 @@ Collapse the app to a small floating icon while playing. The icon glows green wh
 
 This app lets you play music in Where Winds Meet's music minigame! Just add your MIDI files, click play, and the app will automatically press the keyboard keys for you. It's like having an auto-play feature for the in-game instrument.
 
+## Support
+
+If you enjoy this app, consider supporting me on Ko-fi!
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/snowiy)
+
 ## Features
 
 - **Beautiful Spotify-style interface** - Dark theme with smooth animations

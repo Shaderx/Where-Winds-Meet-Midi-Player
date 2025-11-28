@@ -20,6 +20,7 @@ windows = { version = "0.58", features = ["Win32_Foundation", "Win32_UI_WindowsA
 tauri-plugin-dialog = "2.4.2"
 xcap = "0.0.14"
 image = "0.25"
+open = "5"
 
 [features]
 default = ["custom-protocol"]

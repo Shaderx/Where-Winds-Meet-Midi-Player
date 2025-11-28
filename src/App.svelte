@@ -1,6 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import { listen } from "@tauri-apps/api/event";
+  import { invoke } from "@tauri-apps/api/core";
   import { fade, fly } from "svelte/transition";
   import Icon from "@iconify/svelte";
   import appIcon from "./icon.png";
@@ -294,6 +295,15 @@
             </button> -->
 
             <p class="text-xs text-white/40 px-3">By YueLyn</p>
+            <!-- Ko-fi Support -->
+            <button
+              onclick={() => invoke('open_url', { url: 'https://ko-fi.com/snowiy' })}
+              class="flex items-center gap-2 px-3 py-2 rounded-lg text-white/60 hover:text-[#ff5e5b] hover:bg-[#ff5e5b]/10 transition-all w-full mt-1"
+              title="Support me on Ko-fi"
+            >
+              <Icon icon="simple-icons:kofi" class="w-4 h-4" />
+              <span class="text-xs">Support on Ko-fi</span>
+            </button>
             <!-- Keyboard Shortcuts Info -->
             <div class="px-3 py-3 bg-white/5 rounded-lg mt-2">
               <p

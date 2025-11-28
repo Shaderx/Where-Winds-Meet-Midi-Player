@@ -470,6 +470,11 @@ async fn seek(
     Ok(())
 }
 
+#[tauri::command]
+async fn open_url(url: String) -> Result<(), String> {
+    open::that(&url).map_err(|e| e.to_string())
+}
+
 
 fn register_global_hotkeys() -> Vec<(&'static str, bool)> {
     let mut results = Vec::new();
@@ -666,6 +671,7 @@ fn main() {
             focus_game_window,
             seek,
             import_midi_file,
+            open_url,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
