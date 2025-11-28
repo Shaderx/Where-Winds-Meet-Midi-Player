@@ -29,7 +29,8 @@ If you enjoy this app, consider supporting me on Ko-fi!
 
 - **Beautiful Spotify-style interface** - Dark theme with smooth animations
 - **Easy to use** - Just drag your MIDI files and click play
-- **Play without focus** - No need to focus the game window, play while doing other things
+- **Play without focus** - No need to focus the game window, play while doing other things (local mode only)
+- **Cloud gaming support** - Works with GeForce Now, Xbox Cloud Gaming, etc. (requires focus)
 - **Smart music selection** - Automatically adjusts notes to fit the game's instrument
 - **Multiple note modes** - 7 different note calculation algorithms to choose from
 - **21/36 key toggle** - Switch between 21-key (natural notes) and 36-key (with sharps/flats) modes
@@ -106,6 +107,21 @@ You can change modes in real-time during playback using the `[` and `]` keys or 
 | **36 Keys** | Includes sharps/flats (⚠️ experimental, unstable) |
 
 Toggle between key modes using the "21/36" button in the bottom bar. **36-key mode is currently unstable** - we're exploring better approaches for sharp/flat support.
+
+### Cloud Gaming Mode
+
+For cloud gaming services like GeForce Now, Xbox Cloud Gaming, etc., enable **Cloud Gaming Mode** in Settings.
+
+| Mode | How it works | Background play |
+|------|--------------|-----------------|
+| **Local (default)** | PostMessage to game window | Yes |
+| **Cloud Gaming** | SendInput (global keyboard) | No |
+
+**Important warnings for Cloud Gaming Mode:**
+- Uses SendInput which simulates real keyboard globally
+- You MUST keep the cloud gaming window focused
+- Don't type while playing - your keyboard inputs will interfere!
+- Background playback is NOT possible in this mode
 
 ### In-App Controls
 

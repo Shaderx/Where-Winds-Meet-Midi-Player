@@ -145,6 +145,46 @@
     return parts[parts.length - 1] || path;
   };
 
+  // Handle keyboard shortcuts when app is focused
+  async function handleKeydown(event) {
+    // Skip if user is typing in an input
+    if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+      return;
+    }
+
+    switch (event.key) {
+      case 'F9':
+        event.preventDefault();
+        await pauseResume();
+        break;
+      case 'F10':
+        event.preventDefault();
+        await playPrevious();
+        break;
+      case 'F11':
+        event.preventDefault();
+        await playNext();
+        break;
+      case 'F12':
+      case 'End':
+        event.preventDefault();
+        await stopPlayback();
+        break;
+      case '[':
+        event.preventDefault();
+        prevNoteMode();
+        break;
+      case ']':
+        event.preventDefault();
+        nextNoteMode();
+        break;
+      case 'Insert':
+        event.preventDefault();
+        toggleMiniMode();
+        break;
+    }
+  }
+
   // Toggle body/html background and overflow based on mini mode
   $: {
     if (typeof document !== "undefined") {
@@ -164,6 +204,8 @@
     }
   }
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 {#if $miniMode}
   <!-- Mini Mode - Container with drag handle -->

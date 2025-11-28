@@ -1,12 +1,26 @@
 // Virtual keyboard input using PostMessage to game window
 // Sends WM_KEYDOWN/WM_KEYUP directly - doesn't affect other apps!
 
-use std::sync::atomic::{AtomicU64, AtomicIsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicIsize, AtomicBool, Ordering};
 use std::time::{Instant, Duration};
 use std::sync::Mutex;
 
 // Configurable modifier delay in milliseconds (default 2ms)
 static MODIFIER_DELAY_MS: AtomicU64 = AtomicU64::new(2);
+
+// Input mode: false = PostMessage (default), true = SendInput (for cloud gaming)
+static USE_SEND_INPUT: AtomicBool = AtomicBool::new(false);
+
+/// Set input mode: true = SendInput (cloud gaming), false = PostMessage (local)
+pub fn set_send_input_mode(enabled: bool) {
+    USE_SEND_INPUT.store(enabled, Ordering::SeqCst);
+    println!("[KEYBOARD] Input mode: {}", if enabled { "SendInput (cloud)" } else { "PostMessage (local)" });
+}
+
+/// Get current input mode
+pub fn get_send_input_mode() -> bool {
+    USE_SEND_INPUT.load(Ordering::SeqCst)
+}
 
 // Cached window handle and last check time
 static CACHED_HWND: AtomicIsize = AtomicIsize::new(0);
@@ -39,9 +53,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 #[cfg(target_os = "windows")]
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    SendInput, INPUT, INPUT_MOUSE, MOUSEINPUT,
-    MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
-    MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_MOVE,
+    SendInput, INPUT, INPUT_KEYBOARD, KEYBDINPUT,
+    KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE,
     MapVirtualKeyW, MAPVK_VK_TO_VSC,
 };
 #[cfg(target_os = "windows")]
@@ -49,8 +62,8 @@ use windows::Win32::Foundation::{BOOL, HWND, LPARAM, WPARAM};
 
 
 #[cfg(target_os = "windows")]
-const TARGET_WINDOW_KEYWORDS: [&str; 3] =
-    ["where winds meet", "wwm", "wwm.exe"];
+const TARGET_WINDOW_KEYWORDS: [&str; 6] =
+    ["where winds meet", "wwm", "wwm.exe", "geforce now", "geforcenow", "nvidia geforce"];
 
 #[cfg(target_os = "windows")]
 struct EnumData {
@@ -71,19 +84,23 @@ fn matches_target_window(hwnd: HWND, log: bool) -> bool {
         return false;
     }
 
-    let matched = TARGET_WINDOW_KEYWORDS
+    let matched_keyword = TARGET_WINDOW_KEYWORDS
         .iter()
-        .any(|keyword| title_string.contains(keyword));
-    if matched && log {
-        println!("[WINDOW] Found matching window: '{}' hwnd={:?}", title_string, hwnd.0);
+        .find(|keyword| title_string.contains(*keyword));
+    if let Some(keyword) = matched_keyword {
+        if log {
+            println!("[WINDOW] Found matching window: '{}' (matched: '{}') hwnd={:?}", title_string, keyword, hwnd.0);
+        }
+        true
+    } else {
+        false
     }
-    matched
 }
 
 #[cfg(target_os = "windows")]
 unsafe extern "system" fn enum_windows_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
     let data = &mut *(lparam.0 as *mut EnumData);
-    if matches_target_window(hwnd, false) {
+    if matches_target_window(hwnd, true) {
         data.target = Some(hwnd);
         return BOOL(0);
     }
@@ -247,29 +264,84 @@ pub fn reset_modifier_counts() {
     // No longer using reference counting
 }
 
+// ============ SendInput-based functions (for cloud gaming) ============
+
+#[cfg(target_os = "windows")]
+fn send_input_key_down(vk: u32) {
+    unsafe {
+        let scan_code = MapVirtualKeyW(vk, MAPVK_VK_TO_VSC) as u16;
+        let input = INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY(vk as u16),
+                    wScan: scan_code,
+                    dwFlags: KEYEVENTF_SCANCODE,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        };
+        SendInput(&[input], std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn send_input_key_up(vk: u32) {
+    unsafe {
+        let scan_code = MapVirtualKeyW(vk, MAPVK_VK_TO_VSC) as u16;
+        let input = INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY(vk as u16),
+                    wScan: scan_code,
+                    dwFlags: KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        };
+        SendInput(&[input], std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
+// ============ Key down/up with mode switching ============
+
 #[cfg(target_os = "windows")]
 pub fn key_down(key: &str) {
     if let Some((vk, modifier)) = parse_key(key) {
-        match find_game_window() {
-            Some(hwnd) => {
-                unsafe {
-                    // Send modifier first if needed
-                    if let Some(mod_vk) = modifier_to_vk(modifier) {
-                        let mod_lparam = make_keydown_lparam(mod_vk);
-                        let _ = PostMessageW(hwnd, WM_KEYDOWN, WPARAM(mod_vk as usize), mod_lparam);
-                        // Configurable delay so game registers modifier before key
-                        let delay = get_modifier_delay();
-                        if delay > 0 {
-                            std::thread::sleep(std::time::Duration::from_millis(delay));
-                        }
-                    }
-
-                    // Press the key
-                    let lparam = make_keydown_lparam(vk);
-                    let _ = PostMessageW(hwnd, WM_KEYDOWN, WPARAM(vk as usize), lparam);
+        if USE_SEND_INPUT.load(Ordering::SeqCst) {
+            // SendInput mode - global keyboard simulation
+            // Send modifier first if needed
+            if let Some(mod_vk) = modifier_to_vk(modifier) {
+                send_input_key_down(mod_vk);
+                let delay = get_modifier_delay();
+                if delay > 0 {
+                    std::thread::sleep(std::time::Duration::from_millis(delay));
                 }
             }
-            None => {}
+            send_input_key_down(vk);
+        } else {
+            // PostMessage mode - targeted to game window
+            match find_game_window() {
+                Some(hwnd) => {
+                    unsafe {
+                        // Send modifier first if needed
+                        if let Some(mod_vk) = modifier_to_vk(modifier) {
+                            let mod_lparam = make_keydown_lparam(mod_vk);
+                            let _ = PostMessageW(hwnd, WM_KEYDOWN, WPARAM(mod_vk as usize), mod_lparam);
+                            let delay = get_modifier_delay();
+                            if delay > 0 {
+                                std::thread::sleep(std::time::Duration::from_millis(delay));
+                            }
+                        }
+                        let lparam = make_keydown_lparam(vk);
+                        let _ = PostMessageW(hwnd, WM_KEYDOWN, WPARAM(vk as usize), lparam);
+                    }
+                }
+                None => {}
+            }
         }
     }
 }
@@ -277,20 +349,31 @@ pub fn key_down(key: &str) {
 #[cfg(target_os = "windows")]
 pub fn key_up(key: &str) {
     if let Some((vk, modifier)) = parse_key(key) {
-        if let Some(hwnd) = find_game_window() {
-            unsafe {
-                // Release key first
-                let lparam = make_keyup_lparam(vk);
-                let _ = PostMessageW(hwnd, WM_KEYUP, WPARAM(vk as usize), lparam);
+        if USE_SEND_INPUT.load(Ordering::SeqCst) {
+            // SendInput mode - global keyboard simulation
+            send_input_key_up(vk);
+            if let Some(mod_vk) = modifier_to_vk(modifier) {
+                let delay = get_modifier_delay();
+                if delay > 0 {
+                    std::thread::sleep(std::time::Duration::from_millis(delay));
+                }
+                send_input_key_up(mod_vk);
+            }
+        } else {
+            // PostMessage mode - targeted to game window
+            if let Some(hwnd) = find_game_window() {
+                unsafe {
+                    let lparam = make_keyup_lparam(vk);
+                    let _ = PostMessageW(hwnd, WM_KEYUP, WPARAM(vk as usize), lparam);
 
-                // Then release modifier with configurable delay
-                if let Some(mod_vk) = modifier_to_vk(modifier) {
-                    let delay = get_modifier_delay();
-                    if delay > 0 {
-                        std::thread::sleep(std::time::Duration::from_millis(delay));
+                    if let Some(mod_vk) = modifier_to_vk(modifier) {
+                        let delay = get_modifier_delay();
+                        if delay > 0 {
+                            std::thread::sleep(std::time::Duration::from_millis(delay));
+                        }
+                        let mod_lparam = make_keyup_lparam(mod_vk);
+                        let _ = PostMessageW(hwnd, WM_KEYUP, WPARAM(mod_vk as usize), mod_lparam);
                     }
-                    let mod_lparam = make_keyup_lparam(mod_vk);
-                    let _ = PostMessageW(hwnd, WM_KEYUP, WPARAM(mod_vk as usize), mod_lparam);
                 }
             }
         }
@@ -400,7 +483,7 @@ pub fn focus_black_desert_window() -> Result<(), String> {
             std::thread::sleep(std::time::Duration::from_millis(100));
             Ok(())
         } else {
-            Err("WWM window not found".into())
+            Err("Game window not found (WWM or GeForce Now)".into())
         }
     }
 }
@@ -409,147 +492,3 @@ pub fn focus_black_desert_window() -> Result<(), String> {
 pub fn focus_black_desert_window() -> Result<(), String> {
     Ok(())
 }
-
-/// Click at a specific screen position
-#[cfg(target_os = "windows")]
-pub fn mouse_click(x: i32, y: i32) {
-    use windows::Win32::UI::WindowsAndMessaging::GetSystemMetrics;
-    use windows::Win32::UI::WindowsAndMessaging::{SM_CXSCREEN, SM_CYSCREEN};
-
-    unsafe {
-        // Get screen dimensions for absolute positioning
-        let screen_width = GetSystemMetrics(SM_CXSCREEN);
-        let screen_height = GetSystemMetrics(SM_CYSCREEN);
-
-        // Convert to absolute coordinates (0-65535 range)
-        let abs_x = (x as i64 * 65536 / screen_width as i64) as i32;
-        let abs_y = (y as i64 * 65536 / screen_height as i64) as i32;
-
-        // Move mouse and click
-        let inputs = [
-            // Move to position
-            INPUT {
-                r#type: INPUT_MOUSE,
-                Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 {
-                    mi: MOUSEINPUT {
-                        dx: abs_x,
-                        dy: abs_y,
-                        mouseData: 0,
-                        dwFlags: MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE,
-                        time: 0,
-                        dwExtraInfo: 0,
-                    },
-                },
-            },
-            // Mouse down
-            INPUT {
-                r#type: INPUT_MOUSE,
-                Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 {
-                    mi: MOUSEINPUT {
-                        dx: abs_x,
-                        dy: abs_y,
-                        mouseData: 0,
-                        dwFlags: MOUSEEVENTF_LEFTDOWN | MOUSEEVENTF_ABSOLUTE,
-                        time: 0,
-                        dwExtraInfo: 0,
-                    },
-                },
-            },
-            // Mouse up
-            INPUT {
-                r#type: INPUT_MOUSE,
-                Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 {
-                    mi: MOUSEINPUT {
-                        dx: abs_x,
-                        dy: abs_y,
-                        mouseData: 0,
-                        dwFlags: MOUSEEVENTF_LEFTUP | MOUSEEVENTF_ABSOLUTE,
-                        time: 0,
-                        dwExtraInfo: 0,
-                    },
-                },
-            },
-        ];
-
-        SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
-    }
-}
-
-/// Mouse down at a specific screen position (for held notes)
-#[cfg(target_os = "windows")]
-pub fn mouse_down(x: i32, y: i32) {
-    use windows::Win32::UI::WindowsAndMessaging::GetSystemMetrics;
-    use windows::Win32::UI::WindowsAndMessaging::{SM_CXSCREEN, SM_CYSCREEN};
-
-    unsafe {
-        let screen_width = GetSystemMetrics(SM_CXSCREEN);
-        let screen_height = GetSystemMetrics(SM_CYSCREEN);
-
-        let abs_x = (x as i64 * 65536 / screen_width as i64) as i32;
-        let abs_y = (y as i64 * 65536 / screen_height as i64) as i32;
-
-        let inputs = [
-            INPUT {
-                r#type: INPUT_MOUSE,
-                Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 {
-                    mi: MOUSEINPUT {
-                        dx: abs_x,
-                        dy: abs_y,
-                        mouseData: 0,
-                        dwFlags: MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE,
-                        time: 0,
-                        dwExtraInfo: 0,
-                    },
-                },
-            },
-            INPUT {
-                r#type: INPUT_MOUSE,
-                Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 {
-                    mi: MOUSEINPUT {
-                        dx: abs_x,
-                        dy: abs_y,
-                        mouseData: 0,
-                        dwFlags: MOUSEEVENTF_LEFTDOWN | MOUSEEVENTF_ABSOLUTE,
-                        time: 0,
-                        dwExtraInfo: 0,
-                    },
-                },
-            },
-        ];
-
-        SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
-    }
-}
-
-/// Mouse up (release click)
-#[cfg(target_os = "windows")]
-pub fn mouse_up() {
-    unsafe {
-        let inputs = [
-            INPUT {
-                r#type: INPUT_MOUSE,
-                Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 {
-                    mi: MOUSEINPUT {
-                        dx: 0,
-                        dy: 0,
-                        mouseData: 0,
-                        dwFlags: MOUSEEVENTF_LEFTUP,
-                        time: 0,
-                        dwExtraInfo: 0,
-                    },
-                },
-            },
-        ];
-
-        SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
-    }
-}
-
-#[cfg(not(target_os = "windows"))]
-pub fn mouse_click(_x: i32, _y: i32) {}
-
-#[cfg(not(target_os = "windows"))]
-pub fn mouse_down(_x: i32, _y: i32) {}
-
-#[cfg(not(target_os = "windows"))]
-pub fn mouse_up() {}

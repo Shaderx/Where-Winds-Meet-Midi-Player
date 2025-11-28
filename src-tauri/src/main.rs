@@ -204,6 +204,17 @@ async fn get_modifier_delay() -> Result<u64, String> {
 }
 
 #[tauri::command]
+async fn set_cloud_mode(enabled: bool) -> Result<(), String> {
+    keyboard::set_send_input_mode(enabled);
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_cloud_mode() -> Result<bool, String> {
+    Ok(keyboard::get_send_input_mode())
+}
+
+#[tauri::command]
 async fn test_all_keys() -> Result<(), String> {
     // Test all 21 keys: Low (Z-M), Mid (A-J), High (Q-U)
     let keys = ["z", "x", "c", "v", "b", "n", "m", "a", "s", "d", "f", "g", "h", "j", "q", "w", "e", "r", "t", "y", "u"];
@@ -661,6 +672,8 @@ fn main() {
             get_octave_shift,
             set_modifier_delay,
             get_modifier_delay,
+            set_cloud_mode,
+            get_cloud_mode,
             is_game_focused,
             test_all_keys,
             test_all_keys_36,

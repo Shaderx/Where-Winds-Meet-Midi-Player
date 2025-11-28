@@ -23,8 +23,29 @@
   let spamCount = 50;
   let spamDelay = 20;
   let chordSize = 3;
+  let cloudMode = false;
 
   const isDev = import.meta.env.DEV;
+
+  // Load cloud mode on mount
+  import { onMount } from "svelte";
+  onMount(async () => {
+    try {
+      cloudMode = await invoke('get_cloud_mode');
+    } catch (e) {
+      console.error("Failed to get cloud mode:", e);
+    }
+  });
+
+  async function toggleCloudMode() {
+    cloudMode = !cloudMode;
+    try {
+      await invoke('set_cloud_mode', { enabled: cloudMode });
+    } catch (e) {
+      console.error("Failed to set cloud mode:", e);
+      cloudMode = !cloudMode; // revert on error
+    }
+  }
 
   async function handleSpamTest() {
     if (isSpamming) return;
@@ -447,6 +468,33 @@
         >
           <div
             class="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 {$smartPause
+              ? 'translate-x-7'
+              : 'translate-x-1'}"
+          ></div>
+        </button>
+      </div>
+
+      <!-- Cloud Gaming Mode Toggle -->
+      <div class="flex items-center justify-between py-3 border-t border-white/10">
+        <div>
+          <p class="font-medium text-white">Cloud Gaming Mode</p>
+          <p class="text-sm text-white/60">For GeForce Now, Xbox Cloud, etc.</p>
+          {#if cloudMode}
+            <div class="text-xs text-orange-400 mt-1 space-y-0.5">
+              <p>⚠️ Uses SendInput (global keyboard simulation)</p>
+              <p>⚠️ Background play without focus is NOT possible</p>
+              <p>⚠️ Don't type while playing - keys will interfere!</p>
+            </div>
+          {/if}
+        </div>
+        <button
+          class="relative w-12 h-6 rounded-full transition-colors duration-200 {cloudMode
+            ? 'bg-orange-500'
+            : 'bg-white/20'}"
+          onclick={toggleCloudMode}
+        >
+          <div
+            class="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 {cloudMode
               ? 'translate-x-7'
               : 'translate-x-1'}"
           ></div>
