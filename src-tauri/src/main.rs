@@ -12,6 +12,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     MSG, WM_HOTKEY, WM_KEYDOWN, WM_SYSKEYDOWN, HHOOK, KBDLLHOOKSTRUCT, WH_KEYBOARD_LL,
 };
 use windows::Win32::Foundation::LPARAM;
+use windows::Win32::System::Threading::{GetCurrentProcess, SetPriorityClass, HIGH_PRIORITY_CLASS};
 
 // Global app handle for low-level hook callback
 static mut GLOBAL_APP_HANDLE: Option<AppHandle> = None;
@@ -167,16 +168,43 @@ async fn get_octave_shift(
 }
 
 #[tauri::command]
+async fn set_key_mode(
+    mode: midi::KeyMode,
+    state: State<'_, Arc<Mutex<AppState>>>
+) -> Result<(), String> {
+    let mut app_state = state.lock().unwrap();
+    app_state.set_key_mode(mode);
+    println!("Key mode set to: {:?}", mode);
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_key_mode(
+    state: State<'_, Arc<Mutex<AppState>>>
+) -> Result<midi::KeyMode, String> {
+    let app_state = state.lock().unwrap();
+    Ok(app_state.get_key_mode())
+}
+
+#[tauri::command]
 async fn is_game_focused() -> Result<bool, String> {
-    keyboard::is_black_desert_focused().map_err(|e| e.to_string())
+    keyboard::is_wwm_focused().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn set_modifier_delay(delay_ms: u64) -> Result<(), String> {
+    keyboard::set_modifier_delay(delay_ms);
+    println!("Modifier delay set to: {}ms", delay_ms);
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_modifier_delay() -> Result<u64, String> {
+    Ok(keyboard::get_modifier_delay())
 }
 
 #[tauri::command]
 async fn test_all_keys() -> Result<(), String> {
-    // Focus game window first
-    let _ = keyboard::focus_black_desert_window();
-    std::thread::sleep(std::time::Duration::from_millis(500));
-
     // Test all 21 keys: Low (Z-M), Mid (A-J), High (Q-U)
     let keys = ["z", "x", "c", "v", "b", "n", "m", "a", "s", "d", "f", "g", "h", "j", "q", "w", "e", "r", "t", "y", "u"];
     for key in keys {
@@ -186,6 +214,190 @@ async fn test_all_keys() -> Result<(), String> {
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
 
+    Ok(())
+}
+
+#[tauri::command]
+async fn test_all_keys_36() -> Result<(), String> {
+    // Test all 36 keys including modifiers
+    // 21 normal keys + 9 shift keys (sharps) + 6 ctrl keys (flats)
+
+    // Low octave - natural notes
+    let low_natural = ["z", "x", "c", "v", "b", "n", "m"];
+    // Mid octave - natural notes
+    let mid_natural = ["a", "s", "d", "f", "g", "h", "j"];
+    // High octave - natural notes
+    let high_natural = ["q", "w", "e", "r", "t", "y", "u"];
+
+    // Sharps (Shift+key): #1, #4, #5 per octave
+    let low_sharps = ["shift+z", "shift+v", "shift+b"];  // C#, F#, G#
+    let mid_sharps = ["shift+a", "shift+f", "shift+g"];
+    let high_sharps = ["shift+q", "shift+r", "shift+t"];
+
+    // Flats (Ctrl+key): b3, b7 per octave
+    let low_flats = ["ctrl+c", "ctrl+m"];  // Eb, Bb
+    let mid_flats = ["ctrl+d", "ctrl+j"];
+    let high_flats = ["ctrl+e", "ctrl+u"];
+
+    println!("Testing 36-key mode...");
+
+    // Test low octave
+    println!("Low octave - natural notes:");
+    for key in low_natural {
+        keyboard::key_down(key);
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        keyboard::key_up(key);
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+
+    println!("Low octave - sharps:");
+    for key in low_sharps {
+        keyboard::key_down(key);
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        keyboard::key_up(key);
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+
+    println!("Low octave - flats:");
+    for key in low_flats {
+        keyboard::key_down(key);
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        keyboard::key_up(key);
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+
+    // Test mid octave
+    println!("Mid octave - natural notes:");
+    for key in mid_natural {
+        keyboard::key_down(key);
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        keyboard::key_up(key);
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+
+    println!("Mid octave - sharps:");
+    for key in mid_sharps {
+        keyboard::key_down(key);
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        keyboard::key_up(key);
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+
+    println!("Mid octave - flats:");
+    for key in mid_flats {
+        keyboard::key_down(key);
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        keyboard::key_up(key);
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+
+    // Test high octave
+    println!("High octave - natural notes:");
+    for key in high_natural {
+        keyboard::key_down(key);
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        keyboard::key_up(key);
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+
+    println!("High octave - sharps:");
+    for key in high_sharps {
+        keyboard::key_down(key);
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        keyboard::key_up(key);
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+
+    println!("High octave - flats:");
+    for key in high_flats {
+        keyboard::key_down(key);
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        keyboard::key_up(key);
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+
+    println!("36-key test complete!");
+    Ok(())
+}
+
+/// Spam test - rapidly press keys to test PostMessage reliability
+/// delay_ms: delay between each key press (0 = max speed)
+#[tauri::command]
+fn spam_test(key: String, count: u32, delay_ms: u64) -> Result<(), String> {
+    println!("[SPAM] Starting: key='{}' count={} delay={}ms", key, count, delay_ms);
+
+    for _ in 0..count {
+        keyboard::key_down(&key);
+        std::thread::sleep(std::time::Duration::from_micros(500));
+        keyboard::key_up(&key);
+
+        if delay_ms > 0 {
+            std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+        }
+    }
+
+    println!("[SPAM] Complete! {} keys sent", count);
+    Ok(())
+}
+
+/// Multi-key spam test - rapidly press multiple different keys
+#[tauri::command]
+fn spam_test_multi(count: u32, delay_ms: u64) -> Result<(), String> {
+    let keys = [
+        "z", "x", "c", "v", "b", "n", "m",  // Low
+        "a", "s", "d", "f", "g", "h", "j",  // Mid
+        "q", "w", "e", "r", "t", "y", "u",  // High
+    ];
+    println!("[SPAM-MULTI] Starting: {} iterations, delay={}ms, 21 keys", count, delay_ms);
+
+    for i in 0..count {
+        let key = keys[i as usize % keys.len()];
+        keyboard::key_down(key);
+        std::thread::sleep(std::time::Duration::from_micros(500));
+        keyboard::key_up(key);
+
+        if delay_ms > 0 {
+            std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+        }
+    }
+
+    println!("[SPAM-MULTI] Complete! {} keys sent", count);
+    Ok(())
+}
+
+/// Chord test - press multiple keys at the SAME time
+#[tauri::command]
+fn spam_test_chord(chord_size: u32, count: u32, delay_ms: u64) -> Result<(), String> {
+    let keys = [
+        "z", "x", "c", "v", "b", "n", "m",  // Low
+        "a", "s", "d", "f", "g", "h", "j",  // Mid
+        "q", "w", "e", "r", "t", "y", "u",  // High
+    ];
+    let size = chord_size.min(21) as usize;
+    println!("[CHORD] Starting: {} notes per chord, {} chords, delay={}ms", size, count, delay_ms);
+
+    for c in 0..count {
+        // Press all keys in chord
+        for i in 0..size {
+            let key_idx = (c as usize * size + i) % 21;
+            keyboard::key_down(keys[key_idx]);
+        }
+
+        // Hold chord
+        std::thread::sleep(std::time::Duration::from_millis(50));
+
+        // Release all keys in chord
+        for i in 0..size {
+            let key_idx = (c as usize * size + i) % 21;
+            keyboard::key_up(keys[key_idx]);
+        }
+
+        if delay_ms > 0 {
+            std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+        }
+    }
+
+    println!("[CHORD] Complete! {} chords sent", count);
     Ok(())
 }
 
@@ -404,7 +616,22 @@ fn start_hotkey_listener(app_handle: AppHandle) {
     });
 }
 
+/// Set process priority to HIGH for better timing accuracy
+fn set_high_priority() {
+    unsafe {
+        let process = GetCurrentProcess();
+        if SetPriorityClass(process, HIGH_PRIORITY_CLASS).is_ok() {
+            println!("Process priority set to HIGH");
+        } else {
+            eprintln!("Failed to set process priority to HIGH");
+        }
+    }
+}
+
 fn main() {
+    // Set high priority for accurate MIDI timing
+    set_high_priority();
+
     let app_state = Arc::new(Mutex::new(AppState::new()));
 
     tauri::Builder::default()
@@ -423,10 +650,18 @@ fn main() {
             set_loop_mode,
             set_note_mode,
             get_note_mode,
+            set_key_mode,
+            get_key_mode,
             set_octave_shift,
             get_octave_shift,
+            set_modifier_delay,
+            get_modifier_delay,
             is_game_focused,
             test_all_keys,
+            test_all_keys_36,
+            spam_test,
+            spam_test_multi,
+            spam_test_chord,
             set_interaction_mode,
             focus_game_window,
             seek,

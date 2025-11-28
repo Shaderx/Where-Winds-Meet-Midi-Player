@@ -14,6 +14,12 @@ export const loopMode = writable(false);
 // Note calculation mode
 export const noteMode = writable("Closest");
 
+// Key mode (21 or 36 keys)
+export const keyMode = writable("Keys21");
+
+// Modifier delay for sharps/flats in 36-key mode (ms)
+export const modifierDelay = writable(2);
+
 // Octave shift (-2 to +2)
 export const octaveShift = writable(0);
 
@@ -33,7 +39,7 @@ export const favorites = writable([]);
 export const isDraggable = writable(true);
 export const isMinimized = writable(false);
 export const miniMode = writable(false);
-export const smartPause = writable(true);
+export const smartPause = writable(false);
 
 // Store previous window size/position for restore
 let previousWindowState = null;
@@ -85,7 +91,9 @@ const STORAGE_KEYS = {
   FAVORITES: 'wwm-favorites',
   PLAYLISTS: 'wwm-playlists',
   ACTIVE_PLAYLIST: 'wwm-active-playlist',
-  NOTE_MODE: 'wwm-note-mode'
+  NOTE_MODE: 'wwm-note-mode',
+  KEY_MODE: 'wwm-key-mode',
+  MODIFIER_DELAY: 'wwm-modifier-delay'
 };
 
 // Initialize from localStorage
@@ -112,6 +120,23 @@ export async function initializeStorage() {
       noteMode.set(storedNoteMode);
       // Sync with backend
       await invoke('set_note_mode', { mode: storedNoteMode });
+    }
+
+    // Load key mode from localStorage and sync with backend
+    const storedKeyMode = localStorage.getItem(STORAGE_KEYS.KEY_MODE);
+    if (storedKeyMode) {
+      keyMode.set(storedKeyMode);
+      // Sync with backend
+      await invoke('set_key_mode', { mode: storedKeyMode });
+    }
+
+    // Load modifier delay from localStorage and sync with backend
+    const storedModifierDelay = localStorage.getItem(STORAGE_KEYS.MODIFIER_DELAY);
+    if (storedModifierDelay) {
+      const delay = parseInt(storedModifierDelay, 10);
+      modifierDelay.set(delay);
+      // Sync with backend
+      await invoke('set_modifier_delay', { delay_ms: delay });
     }
   } catch (error) {
     console.error('Failed to load from localStorage:', error);
@@ -380,6 +405,19 @@ export async function toggleLoop() {
   }
 }
 
+// Seek to a specific position (in seconds)
+export async function seekTo(position) {
+  try {
+    const duration = get(totalDuration);
+    const clamped = Math.max(0, Math.min(position, duration));
+    currentPosition.set(clamped);
+    await invoke('seek', { position: clamped });
+    delaySmartPause();
+  } catch (error) {
+    console.error('Failed to seek:', error);
+  }
+}
+
 // Set note calculation mode (Default or Detailed)
 export async function setNoteMode(mode) {
   try {
@@ -401,6 +439,52 @@ export async function setOctaveShift(shift) {
     console.log(`Octave shift set to: ${clamped}`);
   } catch (error) {
     console.error('Failed to set octave shift:', error);
+  }
+}
+
+// Set key mode (Keys21 or Keys36)
+export async function setKeyMode(mode) {
+  try {
+    await invoke('set_key_mode', { mode });
+    keyMode.set(mode);
+    localStorage.setItem(STORAGE_KEYS.KEY_MODE, mode);
+    console.log(`Key mode set to: ${mode}`);
+  } catch (error) {
+    console.error('Failed to set key mode:', error);
+  }
+}
+
+// Set modifier delay for sharps/flats (ms)
+export async function setModifierDelay(delayMs) {
+  const clamped = Math.max(0, Math.min(50, delayMs));
+  // Update store immediately for responsive UI
+  modifierDelay.set(clamped);
+  localStorage.setItem(STORAGE_KEYS.MODIFIER_DELAY, clamped.toString());
+  try {
+    await invoke('set_modifier_delay', { delay_ms: clamped });
+    console.log(`Modifier delay set to: ${clamped}ms`);
+  } catch (error) {
+    console.error('Failed to set modifier delay:', error);
+  }
+}
+
+// Test all 21 keys
+export async function testAllKeys() {
+  try {
+    await invoke('test_all_keys');
+    console.log('21-key test complete');
+  } catch (error) {
+    console.error('Failed to test all keys:', error);
+  }
+}
+
+// Test all 36 keys (including modifiers)
+export async function testAllKeys36() {
+  try {
+    await invoke('test_all_keys_36');
+    console.log('36-key test complete');
+  } catch (error) {
+    console.error('Failed to test 36 keys:', error);
   }
 }
 
@@ -564,6 +648,9 @@ async function refreshPlaybackState() {
     }
     if (state.note_mode) {
       noteMode.set(state.note_mode);
+    }
+    if (state.key_mode) {
+      keyMode.set(state.key_mode);
     }
     if (state.octave_shift !== undefined) {
       octaveShift.set(state.octave_shift);

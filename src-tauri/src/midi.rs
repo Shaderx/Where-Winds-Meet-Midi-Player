@@ -15,6 +15,7 @@ pub enum NoteMode {
     Pentatonic = 3,   // Map to pentatonic scale (5 notes)
     Chromatic = 4,    // Detailed chromatic mapping
     Raw = 5,          // Raw 1:1 mapping, no transpose
+    Python = 6,       // Exact 1:1 copy of Python main.py logic
 }
 
 impl From<u8> for NoteMode {
@@ -26,7 +27,26 @@ impl From<u8> for NoteMode {
             3 => NoteMode::Pentatonic,
             4 => NoteMode::Chromatic,
             5 => NoteMode::Raw,
+            6 => NoteMode::Python,
             _ => NoteMode::Closest,
+        }
+    }
+}
+
+/// Key mode - how many keys the instrument has
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(u8)]
+pub enum KeyMode {
+    Keys21 = 0,  // Standard 21 keys (7 notes × 3 octaves)
+    Keys36 = 1,  // 36 keys with Shift/Ctrl for sharps/flats
+}
+
+impl From<u8> for KeyMode {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => KeyMode::Keys21,
+            1 => KeyMode::Keys36,
+            _ => KeyMode::Keys21,
         }
     }
 }
@@ -235,7 +255,7 @@ fn detect_best_transpose(events: &[TimedEvent]) -> i32 {
 
                 // Find distance to nearest instrument note
                 let mut min_distance = i32::MAX;
-                for inst_note in &instrument_notes {
+                for &inst_note in instrument_notes.iter() {
                     let distance = (inst_note - normalized).abs();
                     if distance < min_distance {
                         min_distance = distance;
@@ -254,52 +274,46 @@ fn detect_best_transpose(events: &[TimedEvent]) -> i32 {
     best_transpose
 }
 
-fn get_instrument_notes() -> Vec<i32> {
-    let mut notes = Vec::new();
-
-    // Low octave
-    for interval in SCALE_INTERVALS {
-        notes.push(ROOT_NOTE - 12 + interval);
-    }
-
-    // Mid octave
-    for interval in SCALE_INTERVALS {
-        notes.push(ROOT_NOTE + interval);
-    }
-
-    // High octave
-    for interval in SCALE_INTERVALS {
-        notes.push(ROOT_NOTE + 12 + interval);
-    }
-
-    notes
+#[inline]
+fn get_instrument_notes() -> &'static [i32; 21] {
+    &INSTRUMENT_NOTES
 }
 
 fn normalize_into_range(note: i32) -> i32 {
-    let instrument_notes = get_instrument_notes();
-    let lo = instrument_notes[0];
-    let hi = instrument_notes[instrument_notes.len() - 1];
+    // Match Python version exactly - simple octave shifting
+    // Our instrument range: C3 (48) to B5 (83)
+    let lo = INSTRUMENT_NOTES[0];   // 48
+    let hi = INSTRUMENT_NOTES[20];  // 83
 
-    let mut normalized = note;
-    while normalized < lo {
-        normalized += 12;
+    let mut result = note;
+    while result < lo {
+        result += 12;
     }
-    while normalized > hi {
-        normalized -= 12;
+    while result > hi {
+        result -= 12;
     }
-
-    normalized
+    result
 }
+
+// Pre-computed instrument notes for faster lookup
+const INSTRUMENT_NOTES: [i32; 21] = [
+    // Low octave (C3-B3): 48, 50, 52, 53, 55, 57, 59
+    48, 50, 52, 53, 55, 57, 59,
+    // Mid octave (C4-B4): 60, 62, 64, 65, 67, 69, 71
+    60, 62, 64, 65, 67, 69, 71,
+    // High octave (C5-B5): 72, 74, 76, 77, 79, 81, 83
+    72, 74, 76, 77, 79, 81, 83,
+];
 
 
 fn note_to_key(note: i32, transpose: i32) -> String {
+    // Match Python version exactly
     let target = normalize_into_range(note + transpose);
-    let instrument_notes = get_instrument_notes();
 
     let mut best_idx = 0;
-    let mut best_dist = (instrument_notes[0] - target).abs();
+    let mut best_dist = (INSTRUMENT_NOTES[0] - target).abs();
 
-    for (i, &inst_note) in instrument_notes.iter().enumerate() {
+    for (i, &inst_note) in INSTRUMENT_NOTES.iter().enumerate() {
         let dist = (inst_note - target).abs();
         if dist < best_dist {
             best_idx = i;
@@ -307,59 +321,20 @@ fn note_to_key(note: i32, transpose: i32) -> String {
         }
     }
 
-    // Map index to key
-    let all_keys = [LOW_KEYS.as_slice(), MID_KEYS.as_slice(), HIGH_KEYS.as_slice()].concat();
-    let key = all_keys[best_idx].to_string();
+    // Map index to key (21 keys total)
+    const ALL_KEYS: [&str; 21] = [
+        "z", "x", "c", "v", "b", "n", "m",  // Low
+        "a", "s", "d", "f", "g", "h", "j",  // Mid
+        "q", "w", "e", "r", "t", "y", "u",  // High
+    ];
 
-    // Debug first few mappings
-    static mut DEBUG_COUNT: i32 = 0;
-    unsafe {
-        if DEBUG_COUNT < 5 {
-            println!("Note {} + transpose {} = target {}, matched {}, key: {}",
-                note, transpose, target, instrument_notes[best_idx], key);
-            DEBUG_COUNT += 1;
-        }
-    }
-
-    key
+    ALL_KEYS[best_idx].to_string()
 }
 
 /// Quantize mode - snap to exact scale notes only (no in-between approximation)
 fn note_to_key_quantize(note: i32, transpose: i32) -> String {
-    let target = note + transpose;
-    let instrument_notes = get_instrument_notes();
-    let lo = instrument_notes[0];
-    let hi = instrument_notes[instrument_notes.len() - 1];
-
-    // Normalize to range
-    let mut normalized = target;
-    while normalized < lo {
-        normalized += 12;
-    }
-    while normalized > hi {
-        normalized -= 12;
-    }
-
-    // Find exact match or closest scale note
-    let mut best_idx = 0;
-    let mut best_dist = i32::MAX;
-
-    for (i, &inst_note) in instrument_notes.iter().enumerate() {
-        let dist = (inst_note - normalized).abs();
-        if dist < best_dist {
-            best_idx = i;
-            best_dist = dist;
-        }
-    }
-
-    // Only play if it's an exact match or very close (within 1 semitone)
-    if best_dist > 1 {
-        // Skip notes that don't fit the scale well - map to nearest
-        best_idx = best_idx;
-    }
-
-    let all_keys = [LOW_KEYS.as_slice(), MID_KEYS.as_slice(), HIGH_KEYS.as_slice()].concat();
-    all_keys[best_idx].to_string()
+    // Just use closest mode - same behavior
+    note_to_key(note, transpose)
 }
 
 /// Transpose Only mode - direct semitone to key mapping within octave
@@ -385,51 +360,21 @@ fn note_to_key_transpose(note: i32, transpose: i32) -> String {
 }
 
 /// Pentatonic mode - map to pentatonic scale (5 notes per octave)
-/// Pentatonic: C, D, E, G, A (indices 0, 1, 2, 4, 5 in our 7-note scale)
 fn note_to_key_pentatonic(note: i32, transpose: i32) -> String {
-    let target = note + transpose;
+    let normalized = normalize_into_range(note + transpose);
 
-    // Pentatonic intervals from root: 0, 2, 4, 7, 9 (C, D, E, G, A)
-    const PENTA_INTERVALS: [i32; 5] = [0, 2, 4, 7, 9];
-    const PENTA_KEY_IDX: [usize; 5] = [0, 1, 2, 4, 5]; // Map to do, re, mi, so, la
-
-    // Normalize to range
-    let instrument_notes = get_instrument_notes();
-    let lo = instrument_notes[0];
-    let hi = instrument_notes[instrument_notes.len() - 1];
-
-    let mut normalized = target;
-    while normalized < lo {
-        normalized += 12;
-    }
-    while normalized > hi {
-        normalized -= 12;
-    }
-
-    // Get semitone within octave
+    // Get semitone and octave
     let semitone = ((normalized - ROOT_NOTE) % 12 + 12) % 12;
+    let octave = if normalized < 60 { 0 } else if normalized < 72 { 1 } else { 2 };
 
-    // Determine octave
-    let octave = if normalized < ROOT_NOTE {
-        0
-    } else if normalized < ROOT_NOTE + 12 {
-        1
-    } else {
-        2
+    // Map to pentatonic: C(0), D(2), E(4), G(7), A(9) -> keys 0,1,2,4,5
+    let key_idx = match semitone {
+        0 | 1 => 0,       // C, C# -> do
+        2 | 3 => 1,       // D, Eb -> re
+        4 | 5 | 6 => 2,   // E, F, F# -> mi
+        7 | 8 => 4,       // G, G# -> so
+        _ => 5,           // A, Bb, B -> la
     };
-
-    // Find closest pentatonic note
-    let mut best_penta_idx = 0;
-    let mut best_dist = i32::MAX;
-    for (i, &interval) in PENTA_INTERVALS.iter().enumerate() {
-        let dist = (interval - semitone).abs().min((interval - semitone + 12).abs()).min((interval - semitone - 12).abs());
-        if dist < best_dist {
-            best_dist = dist;
-            best_penta_idx = i;
-        }
-    }
-
-    let key_idx = PENTA_KEY_IDX[best_penta_idx];
 
     match octave {
         0 => LOW_KEYS[key_idx].to_string(),
@@ -440,49 +385,21 @@ fn note_to_key_pentatonic(note: i32, transpose: i32) -> String {
 
 /// Chromatic mode - detailed mapping of all 12 semitones to closest natural key
 fn note_to_key_chromatic(note: i32, transpose: i32) -> String {
-    let target = note + transpose;
+    let normalized = normalize_into_range(note + transpose);
 
-    // Normalize into our 3-octave range
-    let instrument_notes = get_instrument_notes();
-    let lo = instrument_notes[0];
-    let hi = instrument_notes[instrument_notes.len() - 1];
+    // Get semitone and octave
+    let semitone = ((normalized - ROOT_NOTE) % 12 + 12) % 12;
+    let octave = if normalized < 60 { 0 } else if normalized < 72 { 1 } else { 2 };
 
-    let mut normalized = target;
-    while normalized < lo {
-        normalized += 12;
-    }
-    while normalized > hi {
-        normalized -= 12;
-    }
-
-    // Get semitone within octave (0-11)
-    let semitone_in_octave = ((normalized - ROOT_NOTE) % 12 + 12) % 12;
-
-    // Determine which octave we're in
-    let octave = if normalized < ROOT_NOTE {
-        0 // Low
-    } else if normalized < ROOT_NOTE + 12 {
-        1 // Mid
-    } else {
-        2 // High
-    };
-
-    // Map each chromatic semitone to closest natural key (0-6)
-    // Semitone: 0=C, 1=C#, 2=D, 3=Eb, 4=E, 5=F, 6=F#, 7=G, 8=G#, 9=A, 10=Bb, 11=B
-    let key_idx = match semitone_in_octave {
-        0 => 0,   // C -> do
-        1 => 0,   // C# -> do
-        2 => 1,   // D -> re
-        3 => 2,   // Eb -> mi
-        4 => 2,   // E -> mi
-        5 => 3,   // F -> fa
-        6 => 3,   // F# -> fa
-        7 => 4,   // G -> so
-        8 => 4,   // G# -> so
-        9 => 5,   // A -> la
-        10 => 6,  // Bb -> ti
-        11 => 6,  // B -> ti
-        _ => 0,
+    // Map 12 semitones to 7 keys
+    let key_idx = match semitone {
+        0 | 1 => 0,   // C, C# -> do
+        2 => 1,       // D -> re
+        3 | 4 => 2,   // Eb, E -> mi
+        5 | 6 => 3,   // F, F# -> fa
+        7 | 8 => 4,   // G, G# -> so
+        9 => 5,       // A -> la
+        _ => 6,       // Bb, B -> ti
     };
 
     match octave {
@@ -501,6 +418,165 @@ fn note_to_key_raw(note: i32) -> String {
     all_keys[key_idx as usize].to_string()
 }
 
+/// Python mode - EXACT 1:1 copy of main.py logic
+/// This is the proven working implementation
+fn note_to_key_python(note: i32, transpose: i32) -> String {
+    // EXACT copy from Python main.py
+    // SCALE_INTERVALS = [0, 2, 4, 5, 7, 9, 11]
+    // ROOT_NOTE = 60
+    // LOW_SCALE = [48, 50, 52, 53, 55, 57, 59]
+    // MID_SCALE = [60, 62, 64, 65, 67, 69, 71]
+    // HIGH_SCALE = [72, 74, 76, 77, 79, 81, 83]
+    // INSTRUMENT_NOTES = LOW_SCALE + MID_SCALE + HIGH_SCALE (21 notes)
+
+    const PY_INSTRUMENT_NOTES: [i32; 21] = [
+        48, 50, 52, 53, 55, 57, 59,  // LOW_SCALE
+        60, 62, 64, 65, 67, 69, 71,  // MID_SCALE
+        72, 74, 76, 77, 79, 81, 83,  // HIGH_SCALE
+    ];
+
+    const PY_KEYS: [&str; 21] = [
+        "z", "x", "c", "v", "b", "n", "m",  // LOW_KEYS
+        "a", "s", "d", "f", "g", "h", "j",  // MID_KEYS
+        "q", "w", "e", "r", "t", "y", "u",  // HIGH_KEYS
+    ];
+
+    // normalize_into_range - EXACT Python logic
+    let lo = PY_INSTRUMENT_NOTES[0];   // 48
+    let hi = PY_INSTRUMENT_NOTES[20];  // 83
+
+    let mut target = note + transpose;
+    while target < lo {
+        target += 12;
+    }
+    while target > hi {
+        target -= 12;
+    }
+
+    // note_to_key - EXACT Python logic
+    let mut best_idx: usize = 0;
+    let mut best_dist = (PY_INSTRUMENT_NOTES[0] - target).abs();
+
+    for (i, &inst_note) in PY_INSTRUMENT_NOTES.iter().enumerate() {
+        let dist = (inst_note - target).abs();
+        if dist < best_dist {
+            best_idx = i;
+            best_dist = dist;
+        }
+    }
+
+    PY_KEYS[best_idx].to_string()
+}
+
+/// Convert a semitone (0-11) and octave (0-2) to a 36-key string
+/// Natural notes use normal keys, accidentals use Shift/Ctrl modifiers
+fn semitone_to_key_36(semitone: i32, octave: usize) -> String {
+    match semitone {
+        // Natural notes - normal keys
+        0 => match octave { 0 => "z", 1 => "a", _ => "q" }.to_string(),  // C (do)
+        2 => match octave { 0 => "x", 1 => "s", _ => "w" }.to_string(),  // D (re)
+        4 => match octave { 0 => "c", 1 => "d", _ => "e" }.to_string(),  // E (mi)
+        5 => match octave { 0 => "v", 1 => "f", _ => "r" }.to_string(),  // F (fa)
+        7 => match octave { 0 => "b", 1 => "g", _ => "t" }.to_string(),  // G (so)
+        9 => match octave { 0 => "n", 1 => "h", _ => "y" }.to_string(),  // A (la)
+        11 => match octave { 0 => "m", 1 => "j", _ => "u" }.to_string(), // B (ti)
+
+        // Accidentals - Shift or Ctrl + key
+        1 => match octave { 0 => "shift+z", 1 => "shift+a", _ => "shift+q" }.to_string(), // C# (#1)
+        3 => match octave { 0 => "ctrl+c", 1 => "ctrl+d", _ => "ctrl+e" }.to_string(),    // D#/Eb (b3)
+        6 => match octave { 0 => "shift+v", 1 => "shift+f", _ => "shift+r" }.to_string(), // F# (#4)
+        8 => match octave { 0 => "shift+b", 1 => "shift+g", _ => "shift+t" }.to_string(), // G# (#5)
+        10 => match octave { 0 => "ctrl+m", 1 => "ctrl+j", _ => "ctrl+u" }.to_string(),   // A#/Bb (b7)
+
+        _ => "a".to_string(), // Fallback
+    }
+}
+
+/// Calculate octave (0=low, 1=mid, 2=high) for 36-key mode
+fn get_octave_36(target: i32) -> usize {
+    // C3=48, C4=60, C5=72
+    // Low octave: <60, Mid: 60-71, High: >=72
+    if target < 60 {
+        0
+    } else if target < 72 {
+        1
+    } else {
+        2
+    }
+}
+
+/// 36-key Closest mode - find closest available chromatic note
+fn note_to_key_36_closest(note: i32, transpose: i32) -> String {
+    let target = note + transpose;
+    let semitone = ((target % 12) + 12) % 12;
+    let octave = get_octave_36(target);
+    semitone_to_key_36(semitone, octave)
+}
+
+/// 36-key Quantize mode - snap to exact major scale notes only
+fn note_to_key_36_quantize(note: i32, transpose: i32) -> String {
+    let target = note + transpose;
+    let semitone = ((target % 12) + 12) % 12;
+    let octave = get_octave_36(target);
+
+    // Snap to nearest major scale note (0, 2, 4, 5, 7, 9, 11)
+    let quantized = match semitone {
+        0 | 1 => 0,      // C, C# -> C
+        2 | 3 => 2,      // D, D# -> D
+        4 => 4,          // E -> E
+        5 | 6 => 5,      // F, F# -> F
+        7 | 8 => 7,      // G, G# -> G
+        9 | 10 => 9,     // A, A# -> A
+        11 => 11,        // B -> B
+        _ => 0,
+    };
+
+    semitone_to_key_36(quantized, octave)
+}
+
+/// 36-key TransposeOnly mode - direct semitone mapping
+fn note_to_key_36_transpose(note: i32, transpose: i32) -> String {
+    let target = note + transpose;
+    let semitone = ((target % 12) + 12) % 12;
+    let octave = get_octave_36(target);
+    semitone_to_key_36(semitone, octave)
+}
+
+/// 36-key Pentatonic mode - map to pentatonic scale
+/// Pentatonic: C, D, E, G, A (semitones 0, 2, 4, 7, 9)
+fn note_to_key_36_pentatonic(note: i32, transpose: i32) -> String {
+    let target = note + transpose;
+    let semitone = ((target % 12) + 12) % 12;
+    let octave = get_octave_36(target);
+
+    // Map to nearest pentatonic note
+    let penta = match semitone {
+        0 | 1 => 0,       // C, C# -> C
+        2 | 3 => 2,       // D, D# -> D
+        4 | 5 | 6 => 4,   // E, F, F# -> E
+        7 | 8 => 7,       // G, G# -> G
+        9 | 10 | 11 => 9, // A, A#, B -> A
+        _ => 0,
+    };
+
+    semitone_to_key_36(penta, octave)
+}
+
+/// 36-key Chromatic mode - full chromatic mapping (same as closest for 36-key)
+fn note_to_key_36_chromatic(note: i32, transpose: i32) -> String {
+    note_to_key_36_closest(note, transpose)
+}
+
+/// 36-key Raw mode - direct 1:1 mapping, no transpose
+fn note_to_key_36_raw(note: i32) -> String {
+    // 36 total keys: 12 per octave × 3 octaves
+    let key_idx = ((note % 36) + 36) % 36;
+    let octave = (key_idx / 12) as usize;
+    let semitone = key_idx % 12;
+
+    semitone_to_key_36(semitone, octave)
+}
+
 
 pub fn play_midi(
     midi_data: MidiData,
@@ -508,6 +584,7 @@ pub fn play_midi(
     is_paused: Arc<AtomicBool>,
     loop_mode: Arc<AtomicBool>,
     note_mode: Arc<AtomicU8>,
+    key_mode: Arc<AtomicU8>,
     octave_shift: Arc<std::sync::atomic::AtomicI8>,
     current_position: Arc<std::sync::Mutex<f64>>,
     seek_offset: Arc<std::sync::Mutex<f64>>,
@@ -539,13 +616,15 @@ pub fn play_midi(
         let mut key_active_count: std::collections::HashMap<String, i32> = std::collections::HashMap::new();
         let mut total_paused_duration = Duration::ZERO;
 
-        // Helper to release all keys
+        // Helper to release all keys and reset modifier counts
         let release_all_keys = |key_active_count: &std::collections::HashMap<String, i32>| {
             for (key, count) in key_active_count {
                 if *count > 0 {
                     crate::keyboard::key_up(key);
                 }
             }
+            // Reset modifier reference counts when stopping
+            crate::keyboard::reset_modifier_counts();
         };
 
         for event in &midi_data.events {
@@ -589,42 +668,49 @@ pub fn play_midi(
                 std::thread::sleep(Duration::from_millis(1));
             }
 
-            // Get key based on note calculation mode (read in realtime for live switching)
-            let current_mode = NoteMode::from(note_mode.load(Ordering::SeqCst));
+            // Get key based on key mode and note calculation mode (read in realtime for live switching)
+            let current_key_mode = KeyMode::from(key_mode.load(Ordering::SeqCst));
+            let current_note_mode = NoteMode::from(note_mode.load(Ordering::SeqCst));
             // Get octave shift in semitones (1 octave = 12 semitones)
             let shift_semitones = octave_shift.load(Ordering::SeqCst) as i32 * 12;
             let total_transpose = midi_data.transpose + shift_semitones;
-            let key = match current_mode {
-                NoteMode::Closest => note_to_key(event.note as i32, total_transpose),
-                NoteMode::Quantize => note_to_key_quantize(event.note as i32, total_transpose),
-                NoteMode::TransposeOnly => note_to_key_transpose(event.note as i32, total_transpose),
-                NoteMode::Pentatonic => note_to_key_pentatonic(event.note as i32, total_transpose),
-                NoteMode::Chromatic => note_to_key_chromatic(event.note as i32, total_transpose),
-                NoteMode::Raw => note_to_key_raw(event.note as i32 + shift_semitones), // Raw ignores auto-transpose, only uses manual shift
+
+            // Select key mapping based on key mode and note mode
+            let key = match current_key_mode {
+                KeyMode::Keys36 => {
+                    // 36-key mode - use note mode with modifier keys
+                    match current_note_mode {
+                        NoteMode::Closest => note_to_key_36_closest(event.note as i32, total_transpose),
+                        NoteMode::Quantize => note_to_key_36_quantize(event.note as i32, total_transpose),
+                        NoteMode::TransposeOnly => note_to_key_36_transpose(event.note as i32, total_transpose),
+                        NoteMode::Pentatonic => note_to_key_36_pentatonic(event.note as i32, total_transpose),
+                        NoteMode::Chromatic => note_to_key_36_chromatic(event.note as i32, total_transpose),
+                        NoteMode::Raw => note_to_key_36_raw(event.note as i32 + shift_semitones),
+                        NoteMode::Python => note_to_key_python(event.note as i32, total_transpose),
+                    }
+                }
+                KeyMode::Keys21 => {
+                    // 21-key mode - use note mode to determine mapping
+                    match current_note_mode {
+                        NoteMode::Closest => note_to_key(event.note as i32, total_transpose),
+                        NoteMode::Quantize => note_to_key_quantize(event.note as i32, total_transpose),
+                        NoteMode::TransposeOnly => note_to_key_transpose(event.note as i32, total_transpose),
+                        NoteMode::Pentatonic => note_to_key_pentatonic(event.note as i32, total_transpose),
+                        NoteMode::Chromatic => note_to_key_chromatic(event.note as i32, total_transpose),
+                        NoteMode::Raw => note_to_key_raw(event.note as i32 + shift_semitones),
+                        NoteMode::Python => note_to_key_python(event.note as i32, total_transpose),
+                    }
+                }
             };
 
             match event.event_type {
                 EventType::NoteOn => {
-                    // Store which key we're pressing for this MIDI note
-                    note_to_pressed_key.insert(event.note, key.clone());
-                    let count = key_active_count.entry(key.clone()).or_insert(0);
-                    if *count == 0 {
-                        crate::keyboard::key_down(&key);
-                    }
-                    *count += 1;
+                    // Simple press-release for each note (game doesn't need hold)
+                    crate::keyboard::key_down(&key);
+                    crate::keyboard::key_up(&key);
                 }
                 EventType::NoteOff => {
-                    // Use the key that was actually pressed for this note, not current mode mapping
-                    if let Some(pressed_key) = note_to_pressed_key.remove(&event.note) {
-                        if let Some(count) = key_active_count.get_mut(&pressed_key) {
-                            if *count > 0 {
-                                *count -= 1;
-                                if *count == 0 {
-                                    crate::keyboard::key_up(&pressed_key);
-                                }
-                            }
-                        }
-                    }
+                    // Ignore note off - we already released on note on
                 }
             }
         }

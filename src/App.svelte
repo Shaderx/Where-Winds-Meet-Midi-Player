@@ -37,12 +37,15 @@
     toggleDraggable,
     noteMode,
     setNoteMode,
+    keyMode,
+    setKeyMode,
     octaveShift,
     setOctaveShift,
   } from "./lib/stores/player.js";
 
   // Note mode options for quick selector
   const noteModeOptions = [
+    { id: "Python", short: "YL", icon: "mdi:heart", desc: "YueLyn most fav play mode" },
     { id: "Closest", short: "CLS", icon: "mdi:target", desc: "Best fit for most songs" },
     { id: "Quantize", short: "QNT", icon: "mdi:grid", desc: "Snap to scale notes" },
     { id: "TransposeOnly", short: "TRP", icon: "mdi:arrow-up-down", desc: "Direct octave shift" },
@@ -72,27 +75,17 @@
 
   let activeView = "library"; // "library", "queue", "favorites", "playlists"
 
-  const navItems = [
-    { id: "library", icon: "mdi:library-music", label: "Library" },
-    {
-      id: "queue",
-      icon: "mdi:playlist-play",
-      label: "Queue",
-      badge: () => $playlist.length,
-    },
-    {
-      id: "favorites",
-      icon: "mdi:heart",
-      label: "Favorites",
-      badge: () => $favorites.length,
-    },
-    {
-      id: "playlists",
-      icon: "mdi:folder-music",
-      label: "Playlists",
-      badge: () => $savedPlaylists.length,
-    },
-    { id: "settings", icon: "mdi:cog", label: "Settings" },
+  // Reactive badge counts
+  $: queueCount = $playlist.length;
+  $: favoritesCount = $favorites.length;
+  $: playlistsCount = $savedPlaylists.length;
+
+  $: navItems = [
+    { id: "library", icon: "mdi:library-music", label: "Library", badge: 0 },
+    { id: "queue", icon: "mdi:playlist-play", label: "Queue", badge: queueCount },
+    { id: "favorites", icon: "mdi:heart", label: "Favorites", badge: favoritesCount },
+    { id: "playlists", icon: "mdi:folder-music", label: "Playlists", badge: playlistsCount },
+    { id: "settings", icon: "mdi:cog", label: "Settings", badge: 0 },
   ];
 
   const shortcuts = [
@@ -275,12 +268,12 @@
                     {/if}
                   </div>
                   <span class="font-medium text-sm">{item.label}</span>
-                  {#if item.badge && item.badge() > 0}
+                  {#if item.badge > 0}
                     <span
                       class="ml-auto text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/60"
                       in:fade={{ duration: 150 }}
                     >
-                      {item.badge()}
+                      {item.badge}
                     </span>
                   {/if}
                 </button>
@@ -372,13 +365,24 @@
               <p class="text-sm font-semibold truncate text-white/90">
                 {filename($currentFile)}
               </p>
-              <p class="text-xs text-white/50 truncate">
-                {#if $playlist.length > 0}
-                  {$playlist.length} tracks in queue
-                {:else}
-                  No tracks in queue
-                {/if}
-              </p>
+              <div class="flex items-center gap-2">
+                <p class="text-xs text-white/50 truncate">
+                  {#if $playlist.length > 0}
+                    {$playlist.length} tracks in queue
+                  {:else}
+                    No tracks in queue
+                  {/if}
+                </p>
+                <!-- Current Mode Badge -->
+                <button
+                  class="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs transition-colors {$noteMode === 'Python' ? 'bg-pink-500/20 text-pink-400' : 'bg-white/10 text-white/50'}"
+                  onclick={() => showModeMenu = !showModeMenu}
+                  title="Current mode: {noteModeOptions.find(m => m.id === $noteMode)?.desc || $noteMode}"
+                >
+                  <Icon icon={noteModeOptions.find(m => m.id === $noteMode)?.icon || 'mdi:music-note'} class="w-3 h-3" />
+                  <span>{noteModeOptions.find(m => m.id === $noteMode)?.short || $noteMode}</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -390,6 +394,16 @@
 
           <!-- Right Controls -->
           <div class="flex items-center gap-2 w-64 justify-end">
+            <!-- Key Mode Toggle (21/36 keys) -->
+            <button
+              class="flex items-center gap-1 px-2 py-1 rounded-md transition-colors text-xs font-medium {$keyMode === 'Keys36' ? 'bg-[#1db954]/20 text-[#1db954]' : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white'}"
+              onclick={() => setKeyMode($keyMode === 'Keys21' ? 'Keys36' : 'Keys21')}
+              title={$keyMode === 'Keys21' ? '21 keys (natural notes only)' : '36 keys (with sharps/flats)'}
+            >
+              <Icon icon="mdi:piano" class="w-3.5 h-3.5" />
+              <span>{$keyMode === 'Keys21' ? '21' : '36'}</span>
+            </button>
+
             <!-- Octave Shift Control -->
             <div class="flex items-center gap-1 bg-white/5 rounded-md px-1.5 py-0.5">
               <button

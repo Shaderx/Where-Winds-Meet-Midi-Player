@@ -27,6 +27,8 @@
   let unlistenDrop = null;
   let unlistenHover = null;
   let unlistenCancel = null;
+  let sortBy = "name-asc"; // name-asc, name-desc, duration-asc, duration-desc
+  let showSortMenu = false;
 
   onMount(async () => {
     // Listen for Tauri drag-drop events
@@ -153,9 +155,29 @@
   // Reactive favorite lookup using a Set for O(1) performance
   $: favoritePaths = new Set($favorites.map(f => f.path));
 
-  $: filteredFiles = $midiFiles.filter((file) =>
-    file.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  $: filteredFiles = $midiFiles
+    .filter((file) => file.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    .sort((a, b) => {
+      switch (sortBy) {
+        case "name-asc":
+          return a.name.localeCompare(b.name);
+        case "name-desc":
+          return b.name.localeCompare(a.name);
+        case "duration-asc":
+          return (a.duration || 0) - (b.duration || 0);
+        case "duration-desc":
+          return (b.duration || 0) - (a.duration || 0);
+        default:
+          return 0;
+      }
+    });
+
+  const sortOptions = [
+    { id: "name-asc", label: "A-Z", icon: "mdi:sort-alphabetical-ascending" },
+    { id: "name-desc", label: "Z-A", icon: "mdi:sort-alphabetical-descending" },
+    { id: "duration-asc", label: "Shortest", icon: "mdi:sort-numeric-ascending" },
+    { id: "duration-desc", label: "Longest", icon: "mdi:sort-numeric-descending" },
+  ];
 
 </script>
 
@@ -204,27 +226,66 @@
       {filteredFiles.length} of {$midiFiles.length} songs
     </p>
 
-    <!-- Search Input -->
-    <div class="relative">
-      <Icon
-        icon="mdi:magnify"
-        class="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 w-5 h-5"
-      />
-      <input
-        type="text"
-        placeholder="Search songs..."
-        bind:value={searchQuery}
-        class="w-full bg-white/5 border border-white/10 rounded-full pl-10 pr-10 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-[#1db954] focus:border-transparent focus:bg-white/10 transition-all"
-      />
-      {#if searchQuery}
+    <!-- Search Input with Sort -->
+    <div class="flex gap-2">
+      <div class="relative flex-1">
+        <Icon
+          icon="mdi:magnify"
+          class="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 w-5 h-5"
+        />
+        <input
+          type="text"
+          placeholder="Search songs..."
+          bind:value={searchQuery}
+          class="w-full bg-white/5 border border-white/10 rounded-full pl-10 pr-10 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-[#1db954] focus:border-transparent focus:bg-white/10 transition-all"
+        />
+        {#if searchQuery}
+          <button
+            onclick={() => (searchQuery = "")}
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+            transition:fade={{ duration: 150 }}
+          >
+            <Icon icon="mdi:close-circle" class="w-5 h-5" />
+          </button>
+        {/if}
+      </div>
+
+      <!-- Sort Button -->
+      <div class="relative">
         <button
-          onclick={() => (searchQuery = "")}
-          class="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
-          transition:fade={{ duration: 150 }}
+          class="h-full px-3 bg-white/5 border border-white/10 rounded-full flex items-center gap-1.5 text-white/60 hover:text-white hover:bg-white/10 transition-all"
+          onclick={(e) => {
+            e.stopPropagation();
+            showSortMenu = !showSortMenu;
+          }}
+          title="Sort by"
         >
-          <Icon icon="mdi:close-circle" class="w-5 h-5" />
+          <Icon icon={sortOptions.find(o => o.id === sortBy)?.icon || "mdi:sort"} class="w-4 h-4" />
+          <span class="text-xs font-medium">{sortOptions.find(o => o.id === sortBy)?.label}</span>
         </button>
-      {/if}
+
+        {#if showSortMenu}
+          <div
+            class="absolute right-0 top-full mt-1 w-36 bg-[#282828] rounded-lg shadow-xl border border-white/10 py-1 z-50"
+            transition:fly={{ y: -5, duration: 150 }}
+            onclick={(e) => e.stopPropagation()}
+          >
+            {#each sortOptions as option}
+              <button
+                class="w-full px-3 py-2 text-left text-sm flex items-center gap-2 transition-colors {sortBy === option.id ? 'text-[#1db954] bg-white/5' : 'text-white/80 hover:bg-white/10'}"
+                onclick={(e) => {
+                  e.stopPropagation();
+                  sortBy = option.id;
+                  showSortMenu = false;
+                }}
+              >
+                <Icon icon={option.icon} class="w-4 h-4" />
+                {option.label}
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
     </div>
   </div>
 
@@ -431,5 +492,6 @@
 <svelte:window
   onclick={() => {
     showPlaylistMenu = null;
+    showSortMenu = false;
   }}
 />

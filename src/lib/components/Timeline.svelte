@@ -5,8 +5,41 @@
     currentPosition,
     totalDuration,
     progress,
-    formatTime
+    formatTime,
+    seekTo
   } from '../stores/player.js';
+
+  let isDragging = false;
+  let progressBar;
+
+  function handleSeek(e) {
+    if (!progressBar || $totalDuration === 0) return;
+
+    const rect = progressBar.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percent = Math.max(0, Math.min(1, x / rect.width));
+    const position = percent * $totalDuration;
+    seekTo(position);
+  }
+
+  function handleMouseDown(e) {
+    isDragging = true;
+    handleSeek(e);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  }
+
+  function handleMouseMove(e) {
+    if (isDragging) {
+      handleSeek(e);
+    }
+  }
+
+  function handleMouseUp() {
+    isDragging = false;
+    window.removeEventListener('mousemove', handleMouseMove);
+    window.removeEventListener('mouseup', handleMouseUp);
+  }
 </script>
 
 <div class="mt-2 {compact ? 'py-1' : ''}">
@@ -16,20 +49,23 @@
     </span>
 
     <div
-      class="group flex-1 h-1 bg-white/20 rounded-full relative"
-      role="progressbar"
+      bind:this={progressBar}
+      class="group flex-1 h-1 bg-white/20 rounded-full relative cursor-pointer"
+      role="slider"
+      tabindex="0"
       aria-valuemin="0"
-      aria-valuemax="100"
-      aria-valuenow={$progress}
-      aria-label="Playback progress"
+      aria-valuemax={$totalDuration}
+      aria-valuenow={$currentPosition}
+      aria-label="Seek playback position"
+      onmousedown={handleMouseDown}
     >
       <div
-        class="h-full bg-white rounded-full relative group-hover:bg-[#1db954]"
-        style="width: {$progress}%; transition: none;"
+        class="h-full bg-white rounded-full relative group-hover:bg-[#1db954] pointer-events-none"
+        style="width: {$progress}%; transition: {isDragging ? 'none' : 'width 0.1s'};"
       >
-        <!-- Playhead - only visible on hover -->
+        <!-- Playhead - only visible on hover or dragging -->
         <div
-          class="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 shadow-lg"
+          class="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg transition-opacity {isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}"
         ></div>
       </div>
     </div>

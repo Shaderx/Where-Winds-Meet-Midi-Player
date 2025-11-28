@@ -5,13 +5,81 @@
   import {
     noteMode,
     setNoteMode,
+    keyMode,
+    setKeyMode,
+    modifierDelay,
+    setModifierDelay,
+    testAllKeys,
+    testAllKeys36,
     smartPause,
   } from "../stores/player.js";
 
   let isTesting = false;
+  let isTesting36 = false;
+  let isSpamming = false;
+  let isSpammingMulti = false;
+  let isSpammingChord = false;
+  let spamKey = "a";
+  let spamCount = 50;
+  let spamDelay = 20;
+  let chordSize = 3;
+
+  const isDev = import.meta.env.DEV;
+
+  async function handleSpamTest() {
+    if (isSpamming) return;
+    isSpamming = true;
+    try {
+      await invoke('spam_test', {
+        key: spamKey,
+        count: parseInt(spamCount),
+        delayMs: parseInt(spamDelay)
+      });
+    } catch (error) {
+      console.error("Spam test failed:", error);
+    } finally {
+      isSpamming = false;
+    }
+  }
+
+  async function handleSpamTestMulti() {
+    if (isSpammingMulti) return;
+    isSpammingMulti = true;
+    try {
+      await invoke('spam_test_multi', {
+        count: parseInt(spamCount),
+        delayMs: parseInt(spamDelay)
+      });
+    } catch (error) {
+      console.error("Multi spam test failed:", error);
+    } finally {
+      isSpammingMulti = false;
+    }
+  }
+
+  async function handleSpamTestChord() {
+    if (isSpammingChord) return;
+    isSpammingChord = true;
+    try {
+      await invoke('spam_test_chord', {
+        chordSize: parseInt(chordSize),
+        count: parseInt(spamCount),
+        delayMs: parseInt(spamDelay)
+      });
+    } catch (error) {
+      console.error("Chord test failed:", error);
+    } finally {
+      isSpammingChord = false;
+    }
+  }
 
   // Note calculation mode options
   const noteModes = [
+    {
+      id: "Python",
+      name: "YueLyn (Recommended)",
+      description: "YueLyn most fav play mode",
+    },
     {
       id: "Closest",
       name: "Closest",
@@ -52,15 +120,27 @@
     smartPause.update((v) => !v);
   }
 
-  async function testAllKeys() {
+  async function handleTestKeys() {
     if (isTesting) return;
     isTesting = true;
     try {
-      await invoke("test_all_keys");
+      await testAllKeys();
     } catch (error) {
       console.error("Failed to test keys:", error);
     } finally {
       isTesting = false;
+    }
+  }
+
+  async function handleTestKeys36() {
+    if (isTesting36) return;
+    isTesting36 = true;
+    try {
+      await testAllKeys36();
+    } catch (error) {
+      console.error("Failed to test 36 keys:", error);
+    } finally {
+      isTesting36 = false;
     }
   }
 </script>
@@ -116,27 +196,182 @@
         {/each}
       </div>
 
-      <!-- Test All Keys Button -->
-      <div class="mt-4 pt-4 border-t border-white/10">
+    </div>
+
+    <!-- Key Mode Section (Play Style) -->
+    <div
+      class="bg-white/5 rounded-xl p-4"
+      in:fly={{ y: 10, duration: 200, delay: 75 }}
+    >
+      <div class="flex items-center gap-2 mb-4">
+        <Icon icon="mdi:piano" class="w-5 h-5 text-[#1db954]" />
+        <h3 class="text-lg font-semibold">Play Style (Key Mode)</h3>
+      </div>
+
+      <p class="text-sm text-white/60 mb-4">
+        Choose between 21-key (natural notes) or 36-key (with sharps/flats)
+      </p>
+
+      <div class="flex gap-3">
         <button
-          class="w-full py-3 px-4 rounded-lg bg-white/10 hover:bg-white/15 transition-colors flex items-center justify-center gap-2 {isTesting
+          class="flex-1 p-4 rounded-lg border-2 transition-all duration-200 {$keyMode === 'Keys21'
+            ? 'border-[#1db954] bg-[#1db954]/10'
+            : 'border-white/10 bg-white/5 hover:border-white/20'}"
+          onclick={() => setKeyMode('Keys21')}
+        >
+          <div class="text-center">
+            <span class="text-2xl font-bold">21</span>
+            <p class="text-xs text-white/60 mt-1">Natural notes</p>
+          </div>
+        </button>
+        <button
+          class="flex-1 p-4 rounded-lg border-2 transition-all duration-200 {$keyMode === 'Keys36'
+            ? 'border-[#1db954] bg-[#1db954]/10'
+            : 'border-white/10 bg-white/5 hover:border-white/20'}"
+          onclick={() => setKeyMode('Keys36')}
+        >
+          <div class="text-center">
+            <span class="text-2xl font-bold">36</span>
+            <p class="text-xs text-white/60 mt-1">With sharps/flats</p>
+          </div>
+        </button>
+      </div>
+
+      <!-- Test Buttons -->
+      <div class="mt-4 pt-4 border-t border-white/10 flex gap-3">
+        <button
+          class="flex-1 py-3 px-4 rounded-lg bg-white/10 hover:bg-white/15 transition-colors flex items-center justify-center gap-2 {isTesting
             ? 'opacity-50 cursor-not-allowed'
             : ''}"
-          onclick={testAllKeys}
+          onclick={handleTestKeys}
           disabled={isTesting}
         >
           <Icon
             icon={isTesting ? "mdi:loading" : "mdi:piano"}
             class="w-5 h-5 {isTesting ? 'animate-spin' : ''}"
           />
-          <span class="font-medium"
-            >{isTesting ? "Testing..." : "Test All Keys"}</span
-          >
+          <span class="font-medium text-sm">{isTesting ? "Testing..." : "Test 21"}</span>
         </button>
-        <p class="text-xs text-white/40 mt-2 text-center">
-          Plays all 21 keys. Focus game window first.
-        </p>
+        <button
+          class="flex-1 py-3 px-4 rounded-lg bg-white/10 hover:bg-white/15 transition-colors flex items-center justify-center gap-2 {isTesting36
+            ? 'opacity-50 cursor-not-allowed'
+            : ''}"
+          onclick={handleTestKeys36}
+          disabled={isTesting36}
+        >
+          <Icon
+            icon={isTesting36 ? "mdi:loading" : "mdi:piano"}
+            class="w-5 h-5 {isTesting36 ? 'animate-spin' : ''}"
+          />
+          <span class="font-medium text-sm">{isTesting36 ? "Testing..." : "Test 36"}</span>
+        </button>
       </div>
+
+      <!-- Modifier Delay (for 36-key mode) -->
+      <div class="mt-4 pt-4 border-t border-white/10">
+        <div class="flex items-center justify-between mb-2">
+          <div>
+            <p class="font-medium text-white text-sm">Modifier Delay</p>
+            <p class="text-xs text-white/60">Timing for Shift/Ctrl keys (sharps/flats in 36-key mode)</p>
+          </div>
+          <span class="text-sm font-mono text-[#1db954]">{$modifierDelay}ms</span>
+        </div>
+        <input
+          type="range"
+          min="0"
+          max="20"
+          step="1"
+          value={$modifierDelay}
+          oninput={(e) => setModifierDelay(parseInt(e.target.value))}
+          class="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#1db954]"
+        />
+        <div class="flex justify-between text-xs text-white/40 mt-1">
+          <span>0ms (fast)</span>
+          <span>20ms (slow)</span>
+        </div>
+      </div>
+
+      <!-- Spam Test (Dev Only) -->
+      {#if isDev}
+        <div class="mt-4 pt-4 border-t border-white/10">
+          <div class="flex items-center gap-2 mb-3">
+            <Icon icon="mdi:bug" class="w-4 h-4 text-orange-400" />
+            <p class="font-medium text-orange-400 text-sm">Spam Test (Dev)</p>
+          </div>
+          <div class="grid grid-cols-3 gap-2 mb-3">
+            <div>
+              <label class="text-xs text-white/60">Key</label>
+              <select
+                bind:value={spamKey}
+                class="w-full mt-1 px-2 py-1 bg-white/10 rounded text-sm"
+              >
+                <option value="z">Z</option>
+                <option value="a">A</option>
+                <option value="q">Q</option>
+                <option value="c">C</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-white/60">Count</label>
+              <input
+                type="number"
+                bind:value={spamCount}
+                min="1"
+                max="200"
+                class="w-full mt-1 px-2 py-1 bg-white/10 rounded text-sm"
+              />
+            </div>
+            <div>
+              <label class="text-xs text-white/60">Delay (ms)</label>
+              <input
+                type="number"
+                bind:value={spamDelay}
+                min="0"
+                max="200"
+                class="w-full mt-1 px-2 py-1 bg-white/10 rounded text-sm"
+              />
+            </div>
+          </div>
+          <div class="grid grid-cols-4 gap-2 mb-2">
+            <div>
+              <label class="text-xs text-white/60">Chord</label>
+              <input
+                type="number"
+                bind:value={chordSize}
+                min="2"
+                max="21"
+                class="w-full mt-1 px-2 py-1 bg-white/10 rounded text-sm"
+              />
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button
+              class="flex-1 py-2 px-3 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/50 transition-colors flex items-center justify-center gap-1 {isSpamming ? 'opacity-50 cursor-not-allowed' : ''}"
+              onclick={handleSpamTest}
+              disabled={isSpamming}
+            >
+              <Icon icon={isSpamming ? "mdi:loading" : "mdi:flash"} class="w-4 h-4 {isSpamming ? 'animate-spin' : ''}" />
+              <span class="font-medium text-xs">{isSpamming ? "..." : "1Key"}</span>
+            </button>
+            <button
+              class="flex-1 py-2 px-3 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50 transition-colors flex items-center justify-center gap-1 {isSpammingMulti ? 'opacity-50 cursor-not-allowed' : ''}"
+              onclick={handleSpamTestMulti}
+              disabled={isSpammingMulti}
+            >
+              <Icon icon={isSpammingMulti ? "mdi:loading" : "mdi:flash-circle"} class="w-4 h-4 {isSpammingMulti ? 'animate-spin' : ''}" />
+              <span class="font-medium text-xs">{isSpammingMulti ? "..." : "21Key"}</span>
+            </button>
+            <button
+              class="flex-1 py-2 px-3 rounded-lg bg-green-500/20 hover:bg-green-500/30 border border-green-500/50 transition-colors flex items-center justify-center gap-1 {isSpammingChord ? 'opacity-50 cursor-not-allowed' : ''}"
+              onclick={handleSpamTestChord}
+              disabled={isSpammingChord}
+            >
+              <Icon icon={isSpammingChord ? "mdi:loading" : "mdi:music"} class="w-4 h-4 {isSpammingChord ? 'animate-spin' : ''}" />
+              <span class="font-medium text-xs">{isSpammingChord ? "..." : "Chord"}</span>
+            </button>
+          </div>
+        </div>
+      {/if}
     </div>
 
     <!-- Keyboard Layout Info -->
@@ -150,8 +385,9 @@
       </div>
 
       <div class="space-y-3 text-sm">
+        <!-- 21-Key Layout -->
         <div class="bg-white/5 rounded-lg p-3">
-          <p class="font-semibold text-white mb-2">21 Keys (3 Octaves)</p>
+          <p class="font-semibold text-white mb-2">21 Keys (Natural Notes)</p>
           <div class="grid grid-cols-3 gap-2 text-xs">
             <div>
               <span class="text-white/40">High:</span>
@@ -164,6 +400,23 @@
             <div>
               <span class="text-white/40">Low:</span>
               <span class="font-mono">Z X C V B N M</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 36-Key Layout -->
+        <div class="bg-white/5 rounded-lg p-3">
+          <p class="font-semibold text-white mb-2">+15 Keys (Sharps/Flats)</p>
+          <div class="space-y-2 text-xs">
+            <div>
+              <span class="text-orange-400">Shift+</span>
+              <span class="text-white/60">C# F# G#:</span>
+              <span class="font-mono text-white/80">Shift+Q/R/T, A/F/G, Z/V/B</span>
+            </div>
+            <div>
+              <span class="text-blue-400">Ctrl+</span>
+              <span class="text-white/60">Eb Bb:</span>
+              <span class="font-mono text-white/80">Ctrl+E/U, D/J, C/M</span>
             </div>
           </div>
         </div>

@@ -16,7 +16,7 @@ tokio = { version = "1", features = ["full"] }
 midly = "0.5"
 enigo = "0.2"
 lazy_static = "1.4"
-windows = { version = "0.58", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse"] }
+windows = { version = "0.58", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse", "Win32_System_Threading"] }
 tauri-plugin-dialog = "2.4.2"
 xcap = "0.0.14"
 image = "0.25"

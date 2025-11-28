@@ -4,7 +4,7 @@ use std::time::Instant;
 use tauri::Window;
 use serde::{Serialize, Deserialize};
 
-use crate::midi::NoteMode;
+use crate::midi::{NoteMode, KeyMode};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlaybackState {
@@ -15,6 +15,7 @@ pub struct PlaybackState {
     pub current_file: Option<String>,
     pub loop_mode: bool,
     pub note_mode: NoteMode,
+    pub key_mode: KeyMode,
     pub octave_shift: i8,
 }
 
@@ -23,6 +24,7 @@ pub struct AppState {
     is_paused: Arc<AtomicBool>,
     loop_mode: Arc<AtomicBool>,
     note_mode: Arc<AtomicU8>,
+    key_mode: Arc<AtomicU8>,
     octave_shift: Arc<AtomicI8>,
     current_position: Arc<std::sync::Mutex<f64>>,
     total_duration: Arc<std::sync::Mutex<f64>>,
@@ -39,6 +41,7 @@ impl AppState {
             is_paused: Arc::new(AtomicBool::new(false)),
             loop_mode: Arc::new(AtomicBool::new(false)),
             note_mode: Arc::new(AtomicU8::new(NoteMode::Closest as u8)),
+            key_mode: Arc::new(AtomicU8::new(KeyMode::Keys21 as u8)),
             octave_shift: Arc::new(AtomicI8::new(0)),
             current_position: Arc::new(std::sync::Mutex::new(0.0)),
             total_duration: Arc::new(std::sync::Mutex::new(0.0)),
@@ -55,6 +58,9 @@ impl AppState {
         *self.total_duration.lock().unwrap() = midi_data.duration;
         *self.current_file.lock().unwrap() = Some(path.to_string());
         *self.midi_data.lock().unwrap() = Some(midi_data);
+        // Reset seek offset and position for new song
+        *self.seek_offset.lock().unwrap() = 0.0;
+        *self.current_position.lock().unwrap() = 0.0;
 
         Ok(())
     }
@@ -72,6 +78,7 @@ impl AppState {
             let is_paused = Arc::clone(&self.is_paused);
             let loop_mode = Arc::clone(&self.loop_mode);
             let note_mode = Arc::clone(&self.note_mode);
+            let key_mode = Arc::clone(&self.key_mode);
             let octave_shift = Arc::clone(&self.octave_shift);
             let current_position = Arc::clone(&self.current_position);
             let seek_offset = Arc::clone(&self.seek_offset);
@@ -83,6 +90,7 @@ impl AppState {
                     is_paused,
                     loop_mode,
                     note_mode,
+                    key_mode,
                     octave_shift,
                     current_position,
                     seek_offset,
@@ -102,6 +110,14 @@ impl AppState {
 
     pub fn get_note_mode(&self) -> NoteMode {
         NoteMode::from(self.note_mode.load(Ordering::SeqCst))
+    }
+
+    pub fn set_key_mode(&mut self, mode: KeyMode) {
+        self.key_mode.store(mode as u8, Ordering::SeqCst);
+    }
+
+    pub fn get_key_mode(&self) -> KeyMode {
+        KeyMode::from(self.key_mode.load(Ordering::SeqCst))
     }
 
     pub fn set_octave_shift(&mut self, shift: i8) {
@@ -169,6 +185,7 @@ impl AppState {
             current_file: self.current_file.lock().unwrap().clone(),
             loop_mode: self.loop_mode.load(Ordering::SeqCst),
             note_mode: self.get_note_mode(),
+            key_mode: self.get_key_mode(),
             octave_shift: self.get_octave_shift(),
         }
     }

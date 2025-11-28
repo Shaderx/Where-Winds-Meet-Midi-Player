@@ -1,5 +1,7 @@
-# WWM Overlay - MIDI Music Player (21 Keys)
+# WWM Overlay - MIDI Music Player
 A beautiful music player for Where Winds Meet that plays your MIDI files by automatically pressing the right keyboard keys in-game.
+
+> **Note:** 36-key mode is currently unstable and experimental. We're looking for a better approach. For best results, use the default 21-key mode.
 
 <img width="1180" height="560" alt="image" src="https://github.com/user-attachments/assets/eb5553e1-ef46-48e3-8543-f75929a79fec" />
 
@@ -21,15 +23,19 @@ This app lets you play music in Where Winds Meet's music minigame! Just add your
 
 - **Beautiful Spotify-style interface** - Dark theme with smooth animations
 - **Easy to use** - Just drag your MIDI files and click play
+- **Play without focus** - No need to focus the game window, play while doing other things
 - **Smart music selection** - Automatically adjusts notes to fit the game's instrument
-- **Multiple note modes** - 6 different note calculation algorithms to choose from
+- **Multiple note modes** - 7 different note calculation algorithms to choose from
+- **21/36 key toggle** - Switch between 21-key (natural notes) and 36-key (with sharps/flats) modes
 - **Real-time mode switching** - Change note mode during playback instantly
 - **Octave shift control** - Adjust pitch up or down by up to 2 octaves
 - **Queue system** - Build your playlist and play songs in order
 - **Favorites** - Mark your favorite songs for quick access
+- **Search & sort** - Find songs instantly and sort by name, date, or duration
 - **Multiple playlists** - Create, rename, and manage custom playlists
 - **Drag & drop reordering** - Reorder songs in queue and playlists
 - **Real-time progress** - See exactly where you are in the song
+- **Seek support** - Click anywhere on the timeline to jump to that position
 - **Global hotkeys** - Control playback from anywhere, even when the game is focused
 - **Mini mode** - Collapse to a small floating icon while playing
 - **Song duration display** - See how long each MIDI file is
@@ -49,8 +55,9 @@ This app lets you play music in Where Winds Meet's music minigame! Just add your
 2. **Select a song** - In the app, click on any song in your library
 3. **Add to queue** - Click the playlist icon to add songs to your queue or playlists
 4. **Play** - Click the play button (or press F9)
-5. **Focus the game** - The app will automatically switch focus to the game
-6. **Enjoy!** - The music will play automatically
+5. **Enjoy!** - The music plays automatically, no need to focus the game window
+
+> **Tip:** You can browse the web, use other apps, or do anything else while the music plays - the app sends keys directly to the game window!
 
 ### Keyboard Shortcuts (Global Hotkeys)
 
@@ -69,11 +76,12 @@ These shortcuts work even when the game is focused:
 
 ### Note Calculation Modes
 
-The app offers 6 different algorithms for mapping MIDI notes to the game's 21 keys:
+The app offers 7 different algorithms for mapping MIDI notes to the game's keys:
 
 | Mode | Description |
 |------|-------------|
-| **Closest** | Finds the closest available note (default, best for most songs) |
+| **YueLyn** | Recommended mode - YueLyn's favorite play mode |
+| **Closest** | Finds the closest available note (best for most songs) |
 | **Quantize** | Snaps to exact scale notes only |
 | **Transpose Only** | Direct mapping with octave shifting |
 | **Pentatonic** | Maps to 5-note pentatonic scale (do-re-mi-so-la) |
@@ -82,6 +90,15 @@ The app offers 6 different algorithms for mapping MIDI notes to the game's 21 ke
 
 You can change modes in real-time during playback using the `[` and `]` keys or the mode selector in the bottom bar.
 
+### Key Modes (21 vs 36 Keys)
+
+| Mode | Description |
+|------|-------------|
+| **21 Keys** | Natural notes only (default, most stable) |
+| **36 Keys** | Includes sharps/flats (⚠️ experimental, unstable) |
+
+Toggle between key modes using the "21/36" button in the bottom bar. **36-key mode is currently unstable** - we're exploring better approaches for sharp/flat support.
+
 ### In-App Controls
 
 - **Click any song** to start playing
@@ -89,6 +106,7 @@ You can change modes in real-time during playback using the `[` and `]` keys or 
 - **Playlist icon** - Add to queue or saved playlists
 - **Drag handle** (top of sidebar) - Move the window around
 - **Play/Pause button** - Control playback at the bottom
+- **Timeline** - Click to seek, drag to scrub through the song
 - **Loop button** - Toggle repeat mode
 - **Octave shift** (+/-) - Adjust pitch up or down (bottom bar)
 - **Mode selector** - Quick access to note calculation modes (bottom bar)
@@ -112,15 +130,16 @@ You can change modes in real-time during playback using the `[` and `]` keys or 
 - **Too high or too low?**: Use the octave shift controls (+/-) in the bottom bar to adjust pitch
 - **Multiple songs**: Add multiple songs to your queue for a continuous playlist
 - **Searching**: Use the search box to quickly find songs in your library
+- **Sorting**: Click the sort button to sort by name (A-Z), date added, or duration
 - **Favorites**: Click the heart icon to quickly access your favorite songs later
 - **Mini mode**: Press `Insert` to collapse the app while playing, press again to expand
 
 ## Troubleshooting
 
-**The app won't focus the game**
+**Keys not registering in-game**
 - Make sure Where Winds Meet is running
-- The game window must be visible (not minimized)
-- Try clicking on the game first, then press play
+- The game window must be open (can be in background, but not minimized)
+- Make sure you're in the music minigame interface
 
 **Hotkeys not working**
 - Some hotkeys may conflict with other applications
