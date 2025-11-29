@@ -39,6 +39,7 @@ If you enjoy this app, consider supporting me on Ko-fi!
 - **Multiple note modes** - 7 different note calculation algorithms to choose from
 - **21/36 key toggle** - Switch between 21-key (natural notes) and 36-key (with sharps/flats) modes
 - **Real-time mode switching** - Change note mode during playback instantly
+- **Track selector** - Choose specific MIDI tracks to play in solo mode
 - **Speed control** - Adjust playback speed from 0.25x to 2x
 - **Octave shift control** - Adjust pitch up or down by up to 2 octaves
 - **Queue system** - Build your playlist and play songs in order
@@ -55,6 +56,7 @@ If you enjoy this app, consider supporting me on Ko-fi!
 - **Quick favorite** - One-click favorite button for the currently playing song
 - **Remember window position** - App remembers where you placed it
 - **Large library support** - Optimized metadata caching for 10,000+ MIDI files
+- **Band Mode** - Play together with friends (⚠️ experimental)
 
 ## How to Use
 
@@ -132,6 +134,34 @@ For cloud gaming services like GeForce Now, Xbox Cloud Gaming, etc., enable **Cl
 - Don't type while playing - your keyboard inputs will interfere!
 - Background playback is NOT possible in this mode
 
+### Band Mode (Experimental)
+
+> ⚠️ **Warning:** Band mode is experimental and unstable. Only tested on local networks - bugs are expected!
+
+Play music together with friends! Each player handles different notes or tracks.
+
+**How to use:**
+1. One player creates a room (becomes host)
+2. Share the 6-character room code with friends
+3. Friends join using the code
+4. Host selects a song (auto-transfers to members who don't have it)
+5. Members click "Ready" when ready to play
+6. Host clicks "Play" to start synchronized playback
+
+**Play modes:**
+| Mode | Description |
+|------|-------------|
+| **Split Notes** | Notes are automatically distributed among players (round-robin) |
+| **By Track** | Each player picks a specific MIDI track to play |
+
+**Sync Delay:** Host can adjust delay (0-5s) to compensate for network latency. If members are ahead, increase the delay.
+
+**Known limitations:**
+- Only tested on local networks
+- P2P connection may fail on some network configurations
+- Sync accuracy depends on network conditions
+- File transfer only works for members who don't already have the file
+
 ### In-App Controls
 
 - **Click any song** to start playing
@@ -166,6 +196,7 @@ For cloud gaming services like GeForce Now, Xbox Cloud Gaming, etc., enable **Cl
 - **Sorting**: Click the sort button to sort by name (A-Z), date added, or duration
 - **Favorites**: Click the heart icon to quickly access your favorite songs later
 - **Mini mode**: Press `Insert` to collapse the app while playing, press again to expand
+- **Track selector**: Use the track dropdown in the bottom bar to play only specific instruments/tracks from a MIDI file
 
 ## Troubleshooting
 

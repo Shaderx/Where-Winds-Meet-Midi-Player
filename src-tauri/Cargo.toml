@@ -22,6 +22,7 @@ xcap = "0.0.14"
 image = "0.25"
 open = "5"
 ureq = "2"
+base64 = "0.22"
 
 [features]
 default = ["custom-protocol"]
@@ -30,3 +31,13 @@ custom-protocol = ["tauri/custom-protocol"]
 [[bin]]
 name = "wwm-overlay"
 path = "src/main.rs"
+
+[profile.release]
+# '3' is default for release, can optimize for speed
+opt-level = 3 
+# Speeds up compile times by allowing more parallel compilation units (default is 256 in dev, 1 in release)
+codegen-units = 256 # (Experiment with values > 1)
+# Disabling LTO can speed up compilation, but increases app size and reduces runtime performance
+lto = false
+# Strip debug symbols
+strip = true

@@ -8,6 +8,7 @@
     formatTime,
     seekTo
   } from '../stores/player.js';
+  import { bandStatus, isHost, bandSeek } from '../stores/band.js';
 
   let isDragging = false;
   let progressBar;
@@ -19,7 +20,13 @@
     const x = e.clientX - rect.left;
     const percent = Math.max(0, Math.min(1, x / rect.width));
     const position = percent * $totalDuration;
-    seekTo(position);
+
+    // Use band seek if in band mode and host, otherwise normal seek
+    if ($bandStatus === 'connected' && $isHost) {
+      bandSeek(position);
+    } else {
+      seekTo(position);
+    }
   }
 
   function handleMouseDown(e) {

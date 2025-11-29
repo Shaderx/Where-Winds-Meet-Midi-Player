@@ -51,6 +51,15 @@ impl From<u8> for KeyMode {
     }
 }
 
+/// Band mode filter - how to filter notes for multiplayer
+#[derive(Debug, Clone)]
+pub enum BandFilter {
+    /// Split mode: player plays every Nth note starting from slot
+    Split { slot: usize, total_players: usize },
+    /// Track mode: player plays only notes from a specific track
+    Track { track_id: usize },
+}
+
 #[derive(Debug, Clone)]
 pub struct MidiData {
     pub events: Vec<TimedEvent>,
@@ -63,6 +72,7 @@ pub struct TimedEvent {
     pub time_ms: u64,
     pub event_type: EventType,
     pub note: u8,
+    pub track_id: usize,  // Track index for band mode filtering
 }
 
 #[derive(Debug, Clone)]
@@ -87,6 +97,15 @@ pub struct MidiMetadata {
     pub bpm: u16,           // beats per minute (initial tempo)
     pub note_count: u32,    // total note-on events
     pub note_density: f32,  // notes per second
+}
+
+/// MIDI track information for band mode
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MidiTrackInfo {
+    pub id: usize,          // track index
+    pub name: String,       // track name (from MIDI metadata or generated)
+    pub note_count: u32,    // number of notes in this track
+    pub channel: Option<u8>, // MIDI channel (0-15) if consistent
 }
 
 /// Get all MIDI metadata in a single parse (efficient for bulk loading)
@@ -162,6 +181,72 @@ pub fn get_midi_metadata(path: &str) -> Result<MidiMetadata, String> {
         note_count,
         note_density,
     })
+}
+
+/// Clean track name - keep only printable ASCII chars (A-Z, a-z, 0-9, space, common punctuation)
+fn clean_track_name(raw: &str) -> String {
+    raw.chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == ' ' || *c == '-' || *c == '_' || *c == '.' || *c == '(' || *c == ')')
+        .collect::<String>()
+        .trim()
+        .to_string()
+}
+
+/// Get track information from a MIDI file (for band mode)
+pub fn get_midi_tracks(path: &str) -> Result<Vec<MidiTrackInfo>, String> {
+    let data = std::fs::read(path).map_err(|e| e.to_string())?;
+    let smf = Smf::parse(&data).map_err(|e| e.to_string())?;
+
+    let mut tracks = Vec::new();
+
+    for (idx, track) in smf.tracks.iter().enumerate() {
+        let mut name = String::new();
+        let mut note_count: u32 = 0;
+        let mut channels: std::collections::HashSet<u8> = std::collections::HashSet::new();
+
+        for event in track {
+            match event.kind {
+                TrackEventKind::Meta(midly::MetaMessage::TrackName(n)) => {
+                    name = clean_track_name(&String::from_utf8_lossy(n));
+                }
+                TrackEventKind::Meta(midly::MetaMessage::InstrumentName(n)) => {
+                    if name.is_empty() {
+                        name = clean_track_name(&String::from_utf8_lossy(n));
+                    }
+                }
+                TrackEventKind::Midi { channel, message: MidiMessage::NoteOn { vel, .. } } => {
+                    if vel.as_int() > 0 {
+                        note_count += 1;
+                        channels.insert(channel.as_int());
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        // Only include tracks with notes
+        if note_count > 0 {
+            let channel = if channels.len() == 1 {
+                Some(*channels.iter().next().unwrap())
+            } else {
+                None
+            };
+
+            // Generate name if not found
+            if name.is_empty() {
+                name = format!("Track {}", idx + 1);
+            }
+
+            tracks.push(MidiTrackInfo {
+                id: idx,
+                name,
+                note_count,
+                channel,
+            });
+        }
+    }
+
+    Ok(tracks)
 }
 
 /// Quick function to get MIDI duration without full processing
@@ -263,7 +348,7 @@ pub fn load_midi(path: &str) -> Result<MidiData, String> {
     };
 
     // Second pass: process all tracks with proper timing
-    for track in &smf.tracks {
+    for (track_idx, track) in smf.tracks.iter().enumerate() {
         let mut track_time_ticks: u64 = 0;
 
         for event in track {
@@ -278,6 +363,7 @@ pub fn load_midi(path: &str) -> Result<MidiData, String> {
                                 time_ms,
                                 event_type: EventType::NoteOn,
                                 note: key.as_int(),
+                                track_id: track_idx,
                             });
                         } else {
                             // Note on with velocity 0 is treated as note off
@@ -285,6 +371,7 @@ pub fn load_midi(path: &str) -> Result<MidiData, String> {
                                 time_ms,
                                 event_type: EventType::NoteOff,
                                 note: key.as_int(),
+                                track_id: track_idx,
                             });
                         }
                     }
@@ -293,6 +380,7 @@ pub fn load_midi(path: &str) -> Result<MidiData, String> {
                             time_ms,
                             event_type: EventType::NoteOff,
                             note: key.as_int(),
+                            track_id: track_idx,
                         });
                     }
                     _ => {}
@@ -673,9 +761,22 @@ pub fn play_midi(
     speed: Arc<std::sync::atomic::AtomicU16>,
     current_position: Arc<std::sync::Mutex<f64>>,
     seek_offset: Arc<std::sync::Mutex<f64>>,
+    band_filter: Arc<std::sync::Mutex<Option<BandFilter>>>,
     window: Window,
 ) {
     let offset_ms = (*seek_offset.lock().unwrap() * 1000.0) as u64;
+
+    // Log band mode if active at start
+    if let Some(ref filter) = *band_filter.lock().unwrap() {
+        match filter {
+            BandFilter::Split { slot, total_players } => {
+                println!("[BAND] Split mode: playing note {} of every {} notes", slot + 1, total_players);
+            }
+            BandFilter::Track { track_id } => {
+                println!("[BAND] Track mode: playing track {}", track_id);
+            }
+        }
+    }
 
     // Spawn a separate thread for progress updates
     let is_playing_progress = Arc::clone(&is_playing);
@@ -713,6 +814,9 @@ pub fn play_midi(
         // Track song position in milliseconds (not affected by speed changes)
         let mut song_position_ms: u64 = offset_ms;
         let mut last_event_time = Instant::now();
+
+        // Counter for split mode note filtering
+        let mut note_on_counter: usize = 0;
 
         for event in &midi_data.events {
             if event.time_ms < offset_ms {
@@ -812,12 +916,30 @@ pub fn play_midi(
 
             match event.event_type {
                 EventType::NoteOn => {
-                    // Simple press-release for each note (game doesn't need hold)
-                    crate::keyboard::key_down(&key);
-                    crate::keyboard::key_up(&key);
+                    // Check band filter - read live for instant track switching
+                    let current_filter = band_filter.lock().unwrap().clone();
+                    let should_play = match &current_filter {
+                        Some(BandFilter::Split { slot, total_players }) => {
+                            // In split mode, play every Nth note starting from slot
+                            let play = (note_on_counter % total_players) == *slot;
+                            note_on_counter += 1;
+                            play
+                        }
+                        Some(BandFilter::Track { track_id }) => {
+                            // Track mode: only play notes from the assigned track
+                            event.track_id == *track_id
+                        }
+                        None => true, // No filter, play all
+                    };
 
-                    // Emit note event for visualizer
-                    let _ = window.emit("note-event", &key);
+                    if should_play {
+                        // Simple press-release for each note (game doesn't need hold)
+                        crate::keyboard::key_down(&key);
+                        crate::keyboard::key_up(&key);
+
+                        // Emit note event for visualizer
+                        let _ = window.emit("note-event", &key);
+                    }
                 }
                 EventType::NoteOff => {
                     // Ignore note off - we already released on note on

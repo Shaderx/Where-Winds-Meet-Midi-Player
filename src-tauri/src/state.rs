@@ -1,10 +1,10 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU8, AtomicI8, AtomicU16, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicI8, AtomicU16, AtomicUsize, Ordering};
 use std::time::Instant;
 use tauri::Window;
 use serde::{Serialize, Deserialize};
 
-use crate::midi::{NoteMode, KeyMode, EventType};
+use crate::midi::{NoteMode, KeyMode, EventType, BandFilter};
 
 /// Note event for visualizer (simplified for frontend)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,6 +43,8 @@ pub struct AppState {
     playback_start: Arc<std::sync::Mutex<Option<Instant>>>,
     midi_data: Arc<std::sync::Mutex<Option<crate::midi::MidiData>>>,
     seek_offset: Arc<std::sync::Mutex<f64>>,
+    // Band mode filter
+    band_filter: Arc<std::sync::Mutex<Option<BandFilter>>>,
 }
 
 impl AppState {
@@ -61,7 +63,23 @@ impl AppState {
             playback_start: Arc::new(std::sync::Mutex::new(None)),
             midi_data: Arc::new(std::sync::Mutex::new(None)),
             seek_offset: Arc::new(std::sync::Mutex::new(0.0)),
+            band_filter: Arc::new(std::sync::Mutex::new(None)),
         }
+    }
+
+    pub fn set_band_filter(&mut self, mode: String, slot: usize, total_players: usize, track_id: Option<usize>) {
+        let filter = if mode == "split" {
+            Some(BandFilter::Split { slot, total_players })
+        } else if mode == "track" {
+            track_id.map(|id| BandFilter::Track { track_id: id })
+        } else {
+            None
+        };
+        *self.band_filter.lock().unwrap() = filter;
+    }
+
+    pub fn clear_band_filter(&mut self) {
+        *self.band_filter.lock().unwrap() = None;
     }
 
     pub fn load_midi(&mut self, path: &str) -> Result<(), String> {
@@ -95,6 +113,8 @@ impl AppState {
             let speed = Arc::clone(&self.speed);
             let current_position = Arc::clone(&self.current_position);
             let seek_offset = Arc::clone(&self.seek_offset);
+            // Pass Arc reference for live track switching
+            let band_filter = Arc::clone(&self.band_filter);
 
             std::thread::spawn(move || {
                 crate::midi::play_midi(
@@ -108,6 +128,7 @@ impl AppState {
                     speed,
                     current_position,
                     seek_offset,
+                    band_filter,
                     window
                 );
             });
@@ -116,6 +137,12 @@ impl AppState {
         } else {
             Err("No MIDI file loaded".to_string())
         }
+    }
+
+    /// Update band filter live during playback
+    pub fn update_band_filter_live(&self, track_id: Option<usize>) {
+        let filter = track_id.map(|id| BandFilter::Track { track_id: id });
+        *self.band_filter.lock().unwrap() = filter;
     }
 
     pub fn set_note_mode(&mut self, mode: NoteMode) {

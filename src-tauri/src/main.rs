@@ -238,6 +238,11 @@ async fn load_midi_files() -> Result<Vec<MidiFile>, String> {
 }
 
 #[tauri::command]
+async fn get_midi_tracks(path: String) -> Result<Vec<midi::MidiTrackInfo>, String> {
+    midi::get_midi_tracks(&path)
+}
+
+#[tauri::command]
 async fn play_midi(
     path: String,
     state: State<'_, Arc<Mutex<AppState>>>,
@@ -246,6 +251,32 @@ async fn play_midi(
     let mut app_state = state.lock().unwrap();
     app_state.stop_playback();
     app_state.load_midi(&path)?;
+    app_state.start_playback(window)?;
+    drop(app_state);
+
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    let _ = keyboard::focus_black_desert_window();
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn play_midi_band(
+    path: String,
+    mode: String,
+    slot: usize,
+    total_players: usize,
+    track_id: Option<usize>,
+    state: State<'_, Arc<Mutex<AppState>>>,
+    window: Window
+) -> Result<(), String> {
+    let mut app_state = state.lock().unwrap();
+    app_state.stop_playback();
+    app_state.load_midi(&path)?;
+
+    // Set band mode filter before starting playback
+    app_state.set_band_filter(mode, slot, total_players, track_id);
+
     app_state.start_playback(window)?;
     drop(app_state);
 
@@ -308,6 +339,17 @@ async fn get_note_mode(
 ) -> Result<midi::NoteMode, String> {
     let app_state = state.lock().unwrap();
     Ok(app_state.get_note_mode())
+}
+
+#[tauri::command]
+async fn set_track_filter(
+    track_id: Option<usize>,
+    state: State<'_, Arc<Mutex<AppState>>>
+) -> Result<(), String> {
+    let app_state = state.lock().unwrap();
+    app_state.update_band_filter_live(track_id);
+    println!("Track filter set to: {:?}", track_id);
+    Ok(())
 }
 
 #[tauri::command]
@@ -691,6 +733,57 @@ async fn reset_album_path() -> Result<String, String> {
     let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
     let exe_dir = exe_path.parent().ok_or("Failed to get executable directory")?;
     Ok(exe_dir.join("album").to_string_lossy().to_string())
+}
+
+// Band mode: Read MIDI file as base64 for transfer
+#[tauri::command]
+async fn read_midi_base64(path: String) -> Result<String, String> {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+
+    let data = std::fs::read(&path).map_err(|e| format!("Failed to read file: {}", e))?;
+
+    // Verify it's a valid MIDI file (starts with "MThd")
+    if data.len() < 4 || &data[0..4] != b"MThd" {
+        return Err("Not a valid MIDI file".to_string());
+    }
+
+    Ok(STANDARD.encode(&data))
+}
+
+// Band mode: Check if MIDI file exists in album folder by name
+#[tauri::command]
+async fn check_midi_exists(filename: String) -> Result<Option<String>, String> {
+    let album_path = get_album_folder()?;
+    let file_path = album_path.join(&filename);
+
+    if file_path.exists() && file_path.extension().map(|e| e == "mid").unwrap_or(false) {
+        Ok(Some(file_path.to_string_lossy().to_string()))
+    } else {
+        Ok(None)
+    }
+}
+
+// Band mode: Save MIDI file to temp for playback
+#[tauri::command]
+async fn save_temp_midi(filename: String, data_base64: String) -> Result<String, String> {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+
+    let data = STANDARD.decode(&data_base64)
+        .map_err(|e| format!("Failed to decode base64: {}", e))?;
+
+    // Verify it's a valid MIDI file
+    if data.len() < 4 || &data[0..4] != b"MThd" {
+        return Err("Not a valid MIDI file".to_string());
+    }
+
+    // Save to temp directory
+    let temp_dir = std::env::temp_dir().join("wwm-band");
+    std::fs::create_dir_all(&temp_dir).map_err(|e| format!("Failed to create temp dir: {}", e))?;
+
+    let temp_path = temp_dir.join(&filename);
+    std::fs::write(&temp_path, &data).map_err(|e| format!("Failed to write temp file: {}", e))?;
+
+    Ok(temp_path.to_string_lossy().to_string())
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -1213,13 +1306,16 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             load_midi_files,
+            get_midi_tracks,
             play_midi,
+            play_midi_band,
             pause_resume,
             stop_playback,
             get_playback_status,
             set_loop_mode,
             set_note_mode,
             get_note_mode,
+            set_track_filter,
             set_key_mode,
             get_key_mode,
             set_octave_shift,
@@ -1247,6 +1343,9 @@ fn main() {
             get_album_path,
             set_album_path,
             reset_album_path,
+            read_midi_base64,
+            check_midi_exists,
+            save_temp_midi,
             get_window_position,
             save_window_position,
             check_for_update,

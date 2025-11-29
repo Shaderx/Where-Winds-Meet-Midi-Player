@@ -18,6 +18,7 @@
     addToSavedPlaylist,
     importMidiFile,
   } from "../stores/player.js";
+  import { bandSongSelectMode, selectBandSong } from "../stores/band.js";
 
   let searchQuery = "";
   let showPlaylistMenu = null;
@@ -173,6 +174,12 @@
   }
 
   async function handlePlay(file) {
+    // If in band song selection mode, select for band instead of playing
+    if ($bandSongSelectMode) {
+      await selectBandSong(file);
+      return;
+    }
+
     // Add to playlist if not already there
     playlist.update((list) => {
       if (!list.find((f) => f.path === file.path)) {
@@ -285,6 +292,23 @@
         <Icon icon="mdi:loading" class="w-12 h-12 text-[#1db954] mx-auto mb-4 animate-spin" />
         <p class="text-lg font-semibold">Importing files...</p>
       </div>
+    </div>
+  {/if}
+
+  <!-- Band Selection Mode Banner -->
+  {#if $bandSongSelectMode}
+    <div
+      class="mb-3 p-3 rounded-lg bg-[#1db954]/10 border border-[#1db954]/30 flex items-center gap-3"
+      transition:fly={{ y: -10, duration: 200 }}
+    >
+      <Icon icon="mdi:account-group" class="w-5 h-5 text-[#1db954]" />
+      <p class="text-sm flex-1">Select a song for Band Mode</p>
+      <button
+        class="text-xs text-white/50 hover:text-white transition-colors"
+        onclick={() => selectBandSong(null)}
+      >
+        Cancel
+      </button>
     </div>
   {/if}
 
@@ -412,9 +436,9 @@
               <button
                 class="hidden group-hover:flex items-center justify-center w-7 h-7 rounded-full bg-[#1db954] hover:scale-110 transition-transform shadow-lg"
                 onclick={() => handlePlay(file)}
-                title="Play"
+                title={$bandSongSelectMode ? "Select for Band" : "Play"}
               >
-                <Icon icon="mdi:play" class="w-4 h-4 text-black" />
+                <Icon icon={$bandSongSelectMode ? "mdi:check" : "mdi:play"} class="w-4 h-4 text-black" />
               </button>
             {/if}
           {/if}

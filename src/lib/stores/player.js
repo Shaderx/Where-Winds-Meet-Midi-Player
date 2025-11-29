@@ -27,6 +27,10 @@ export const octaveShift = writable(0);
 // Playback speed (0.25 to 2.0, default 1.0)
 export const speed = writable(1.0);
 
+// Track selection for solo play (null = all tracks)
+export const availableTracks = writable([]); // [{ id, name, note_count, channel }]
+export const selectedTrackId = writable(null); // null = all, number = specific track
+
 // Playlist state
 export const midiFiles = writable([]);
 export const playlist = writable([]);
@@ -415,16 +419,49 @@ export async function importMidiFile(sourcePath) {
   }
 }
 
+// Load available tracks for a MIDI file
+export async function loadTracksForFile(path) {
+  if (!path) {
+    availableTracks.set([]);
+    return [];
+  }
+  try {
+    const tracks = await invoke('get_midi_tracks', { path });
+    availableTracks.set(tracks);
+    return tracks;
+  } catch (error) {
+    console.error('Failed to load tracks:', error);
+    availableTracks.set([]);
+    return [];
+  }
+}
+
+// Set selected track for solo play (live update during playback)
+export async function setSelectedTrack(trackId) {
+  selectedTrackId.set(trackId);
+
+  // Update filter live in backend - takes effect immediately on next note
+  await invoke('set_track_filter', { trackId });
+}
+
 // Play a MIDI file
 export async function playMidi(path) {
   try {
     delaySmartPause();
+
+    // Reset track selection when playing a different song
+    const $currentFile = get(currentFile);
+    if (path !== $currentFile) {
+      selectedTrackId.set(null);
+      await invoke('set_track_filter', { trackId: null });
+    }
 
     // Reset state immediately before playing
     currentPosition.set(0);
     isPlaying.set(false);
     isPaused.set(false);
 
+    // Play - the backend will use the already-set track filter
     await invoke('play_midi', { path });
 
     // Small delay to let backend initialize
@@ -448,6 +485,43 @@ export async function playMidi(path) {
     trackSongPlay(filename);
   } catch (error) {
     console.error('Failed to play MIDI:', error);
+  }
+}
+
+// Play a MIDI file for band mode with split/track options
+export async function playMidiBand(file, options = {}) {
+  try {
+    delaySmartPause();
+
+    const path = typeof file === 'string' ? file : file.path;
+    const { mode = 'split', slot = 0, totalPlayers = 1, trackId = null } = options;
+
+    // Reset state immediately before playing
+    currentPosition.set(0);
+    isPlaying.set(false);
+    isPaused.set(false);
+
+    await invoke('play_midi_band', {
+      path,
+      mode,
+      slot,
+      totalPlayers,
+      trackId
+    });
+
+    // Small delay to let backend initialize
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    await refreshPlaybackState();
+    isPlaying.set(true);
+    isPaused.set(false);
+    currentFile.set(path);
+
+    // Track stats
+    const filename = path.split(/[\\/]/).pop() || path;
+    trackSongPlay(filename);
+  } catch (error) {
+    console.error('Failed to play MIDI in band mode:', error);
   }
 }
 

@@ -7,7 +7,7 @@
   import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
 
   // Current version
-  const APP_VERSION = "1.0.7";
+  const APP_VERSION = "1.0.8";
 
   // Game window detection
   let gameFound = false;
@@ -130,6 +130,9 @@
   import SettingsView from "./lib/components/SettingsView.svelte";
   import StatsView from "./lib/components/StatsView.svelte";
   import Visualizer from "./lib/components/Visualizer.svelte";
+  import BandMode from "./lib/components/BandMode.svelte";
+
+  import { bandStatus, connectedPeers, bandSongSelectMode, cancelBandSongSelect, bandSelectedSong } from "./lib/stores/band.js";
 
   import {
     loadMidiFiles,
@@ -162,6 +165,10 @@
     setOctaveShift,
     speed,
     setSpeed,
+    availableTracks,
+    selectedTrackId,
+    loadTracksForFile,
+    setSelectedTrack,
   } from "./lib/stores/player.js";
 
 
@@ -178,8 +185,21 @@
 
   let showModeMenu = false;
   let showSpeedMenu = false;
+  let showTrackMenu = false;
   let showVisualizer = false;
   let showUpdateModal = false;
+
+  // Load tracks when current file changes
+  $: if ($currentFile) {
+    loadTracksForFile($currentFile);
+  } else {
+    setSelectedTrack(null);
+  }
+
+  async function selectTrack(trackId) {
+    showTrackMenu = false;
+    await setSelectedTrack(trackId);
+  }
 
   // Speed presets
   const speedOptions = [
@@ -222,7 +242,10 @@
   $: favoritesCount = $favorites.length;
   $: playlistsCount = $savedPlaylists.length;
 
-  let sidebarTab = "music"; // "music" or "app"
+  let sidebarTab = "music"; // "music", "online", or "app"
+
+  // Band mode connected peers count (excluding self)
+  $: bandPeersCount = $bandStatus === 'connected' ? $connectedPeers.length : 0;
 
   $: musicNavItems = [
     { id: "library", icon: "mdi:library-music", label: "Library", badge: 0 },
@@ -231,12 +254,16 @@
     { id: "playlists", icon: "mdi:folder-music", label: "Playlists", badge: playlistsCount },
   ];
 
+  $: onlineNavItems = [
+    { id: "band", icon: "mdi:account-group", label: "Band", badge: bandPeersCount, status: $bandStatus },
+  ];
+
   $: appNavItems = [
     { id: "stats", icon: "mdi:chart-bar", label: "Stats", badge: 0 },
     { id: "settings", icon: "mdi:cog", label: "Settings", badge: 0 },
   ];
 
-  $: navItems = sidebarTab === "music" ? musicNavItems : appNavItems;
+  $: navItems = sidebarTab === "music" ? musicNavItems : sidebarTab === "online" ? onlineNavItems : appNavItems;
 
   const shortcuts = [
     { action: "Play / Pause", key: "F9" },
@@ -254,6 +281,26 @@
     if (currentFileData) {
       toggleFavorite(currentFileData);
     }
+  }
+
+  function handleBandSelectSong() {
+    activeView = "library";
+    sidebarTab = "music";
+  }
+
+  function handleCancelBandSelect() {
+    cancelBandSongSelect();
+  }
+
+  // Watch for band song selection completion - navigate back to band
+  let prevBandSelectMode = false;
+  $: {
+    // When selection mode turns off (song was selected), go back to band
+    if (prevBandSelectMode && !$bandSongSelectMode && $bandSelectedSong) {
+      activeView = "band";
+      sidebarTab = "online";
+    }
+    prevBandSelectMode = $bandSongSelectMode;
   }
 
   onMount(async () => {
@@ -452,18 +499,25 @@
             <!-- Sidebar Tabs -->
             <div class="flex gap-1 mb-2">
               <button
-                class="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium transition-all {sidebarTab === 'music' ? 'bg-white/10 text-white' : 'text-white/50 hover:text-white hover:bg-white/5'}"
+                class="flex-1 py-1.5 px-1 rounded-lg text-xs font-medium transition-all {sidebarTab === 'music' ? 'bg-white/10 text-white' : 'text-white/50 hover:text-white hover:bg-white/5'}"
                 onclick={() => sidebarTab = 'music'}
               >
-                <Icon icon="mdi:music" class="w-4 h-4 inline mr-1" />
-                Music
+                <Icon icon="mdi:music" class="w-3.5 h-3.5 inline" />
               </button>
               <button
-                class="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium transition-all {sidebarTab === 'app' ? 'bg-white/10 text-white' : 'text-white/50 hover:text-white hover:bg-white/5'}"
+                class="flex-1 py-1.5 px-1 rounded-lg text-xs font-medium transition-all relative {sidebarTab === 'online' ? 'bg-white/10 text-white' : 'text-white/50 hover:text-white hover:bg-white/5'}"
+                onclick={() => sidebarTab = 'online'}
+              >
+                <Icon icon="mdi:access-point" class="w-3.5 h-3.5 inline" />
+                {#if $bandStatus === 'connected'}
+                  <div class="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                {/if}
+              </button>
+              <button
+                class="flex-1 py-1.5 px-1 rounded-lg text-xs font-medium transition-all {sidebarTab === 'app' ? 'bg-white/10 text-white' : 'text-white/50 hover:text-white hover:bg-white/5'}"
                 onclick={() => sidebarTab = 'app'}
               >
-                <Icon icon="mdi:cog" class="w-4 h-4 inline mr-1" />
-                App
+                <Icon icon="mdi:cog" class="w-3.5 h-3.5 inline" />
               </button>
             </div>
 
@@ -493,7 +547,9 @@
                     {/if}
                   </div>
                   <span class="font-medium text-sm">{item.label}</span>
-                  {#if item.badge > 0}
+                  {#if item.status}
+                    <div class="ml-auto w-2 h-2 rounded-full {item.status === 'connected' ? 'bg-green-500' : item.status === 'connecting' ? 'bg-yellow-500 animate-pulse' : 'bg-white/20'}"></div>
+                  {:else if item.badge > 0}
                     <span
                       class="ml-auto text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/60"
                       in:fade={{ duration: 150 }}
@@ -572,6 +628,8 @@
                     <FavoritesView />
                   {:else if activeView === "playlists"}
                     <SavedPlaylistsView />
+                  {:else if activeView === "band"}
+                    <BandMode on:selectsong={handleBandSelectSong} />
                   {:else if activeView === "stats"}
                     <StatsView />
                   {:else if activeView === "settings"}
@@ -716,6 +774,69 @@
                   </div>
                 {/if}
               </div>
+
+              <!-- Track Selector (hidden in band mode) -->
+              {#if $availableTracks.length > 1 && $bandStatus !== 'connected'}
+                <div class="relative">
+                  <button
+                    class="flex items-center gap-1 px-2 py-1 rounded-md transition-colors text-xs font-medium {$selectedTrackId !== null ? 'bg-purple-500/20 text-purple-400' : 'text-white/50 hover:text-white hover:bg-white/5'}"
+                    onclick={() => showTrackMenu = !showTrackMenu}
+                    title="Select track to play"
+                  >
+                    <Icon icon="mdi:playlist-music" class="w-3.5 h-3.5" />
+                    <span class="max-w-[60px] truncate">
+                      {#if $selectedTrackId === null}
+                        All
+                      {:else}
+                        {$availableTracks.find(t => t.id === $selectedTrackId)?.name || `Track ${$selectedTrackId + 1}`}
+                      {/if}
+                    </span>
+                  </button>
+                  {#if showTrackMenu}
+                    <button class="fixed inset-0 z-40" onclick={() => showTrackMenu = false}></button>
+                    <div
+                      class="absolute bottom-full right-0 mb-2 bg-[#282828] rounded-lg shadow-xl border border-white/10 overflow-hidden z-50 min-w-[180px] max-w-[250px] max-h-[300px] overflow-y-auto scrollbar-thin"
+                      in:fly={{ y: 10, duration: 150 }}
+                      out:fade={{ duration: 100 }}
+                    >
+                      <div class="py-1">
+                        <!-- All tracks option -->
+                        <button
+                          class="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors {$selectedTrackId === null ? 'bg-purple-500/20' : 'hover:bg-white/5'}"
+                          onclick={() => selectTrack(null)}
+                        >
+                          <Icon icon="mdi:playlist-play" class="w-4 h-4 flex-shrink-0 {$selectedTrackId === null ? 'text-purple-400' : 'text-white/50'}" />
+                          <div class="flex-1 min-w-0">
+                            <div class="text-sm font-medium {$selectedTrackId === null ? 'text-purple-400' : 'text-white/90'}">All Tracks</div>
+                            <div class="text-xs {$selectedTrackId === null ? 'text-purple-400/70' : 'text-white/40'}">Play everything</div>
+                          </div>
+                          {#if $selectedTrackId === null}
+                            <Icon icon="mdi:check" class="w-4 h-4 text-purple-400 flex-shrink-0" />
+                          {/if}
+                        </button>
+                        <!-- Divider -->
+                        <div class="h-px bg-white/10 my-1"></div>
+                        <!-- Individual tracks -->
+                        {#each $availableTracks as track}
+                          <button
+                            class="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors {$selectedTrackId === track.id ? 'bg-purple-500/20' : 'hover:bg-white/5'}"
+                            onclick={() => selectTrack(track.id)}
+                          >
+                            <Icon icon="mdi:music-note" class="w-4 h-4 flex-shrink-0 {$selectedTrackId === track.id ? 'text-purple-400' : 'text-white/50'}" />
+                            <div class="flex-1 min-w-0">
+                              <div class="text-sm font-medium truncate {$selectedTrackId === track.id ? 'text-purple-400' : 'text-white/90'}">{track.name}</div>
+                              <div class="text-xs {$selectedTrackId === track.id ? 'text-purple-400/70' : 'text-white/40'}">{track.note_count} notes</div>
+                            </div>
+                            {#if $selectedTrackId === track.id}
+                              <Icon icon="mdi:check" class="w-4 h-4 text-purple-400 flex-shrink-0" />
+                            {/if}
+                          </button>
+                        {/each}
+                      </div>
+                    </div>
+                  {/if}
+                </div>
+              {/if}
 
               <!-- Visualizer Toggle (commented out)
               <button
