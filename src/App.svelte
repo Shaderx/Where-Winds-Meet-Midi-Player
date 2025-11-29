@@ -5,7 +5,7 @@
   import { onDestroy } from "svelte";
 
   // Current version
-  const APP_VERSION = "1.0.6";
+  const APP_VERSION = "1.0.7";
 
   // Game window detection
   let gameFound = false;

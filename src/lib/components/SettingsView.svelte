@@ -40,7 +40,7 @@
   let albumPath = "";
   let isChangingPath = false;
 
-  const APP_VERSION = "1.0.6";
+  const APP_VERSION = "1.0.7";
   let updateAvailable = null;
 
   const isDev = import.meta.env.DEV;

@@ -60,13 +60,11 @@ fn save_album_path(path: Option<&str>) {
 }
 
 fn get_album_folder() -> Result<std::path::PathBuf, String> {
-    // Check if custom path is set
+    // Check if custom path is set - return it even if it doesn't exist yet
+    // (the caller will create it if needed)
     if let Ok(guard) = ALBUM_PATH.read() {
         if let Some(ref custom_path) = *guard {
-            let path = std::path::PathBuf::from(custom_path);
-            if path.exists() {
-                return Ok(path);
-            }
+            return Ok(std::path::PathBuf::from(custom_path));
         }
     }
 
