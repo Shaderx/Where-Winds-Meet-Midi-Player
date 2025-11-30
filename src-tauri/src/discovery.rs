@@ -187,9 +187,12 @@ pub async fn start_server(port: u16) -> Result<(), String> {
     Ok(())
 }
 
-// Global server handle
-static SERVER_HANDLE: std::sync::OnceLock<tokio::sync::oneshot::Sender<()>> = std::sync::OnceLock::new();
+// Global server handle for shutdown
+use std::sync::Mutex;
+use tokio::sync::broadcast;
+
 static SERVER_RUNNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static SHUTDOWN_SENDER: Mutex<Option<broadcast::Sender<()>>> = Mutex::new(None);
 
 pub fn is_server_running() -> bool {
     SERVER_RUNNING.load(std::sync::atomic::Ordering::SeqCst)
@@ -200,11 +203,85 @@ pub async fn start_discovery_server(port: u16) -> Result<(), String> {
         return Err("Server already running".to_string());
     }
 
+    // Create shutdown channel
+    let (tx, _) = broadcast::channel::<()>(1);
+    {
+        let mut sender = SHUTDOWN_SENDER.lock().unwrap();
+        *sender = Some(tx.clone());
+    }
+
     SERVER_RUNNING.store(true, std::sync::atomic::Ordering::SeqCst);
 
-    let result = start_server(port).await;
+    let result = start_server_with_shutdown(port, tx).await;
 
     SERVER_RUNNING.store(false, std::sync::atomic::Ordering::SeqCst);
 
+    // Clean up shutdown sender
+    {
+        let mut sender = SHUTDOWN_SENDER.lock().unwrap();
+        *sender = None;
+    }
+
     result
+}
+
+pub fn stop_discovery_server() -> Result<(), String> {
+    if !is_server_running() {
+        return Err("Server is not running".to_string());
+    }
+
+    let sender = SHUTDOWN_SENDER.lock().unwrap();
+    if let Some(tx) = sender.as_ref() {
+        let _ = tx.send(());
+        println!("[DISCOVERY] Shutdown signal sent");
+        Ok(())
+    } else {
+        Err("No shutdown handle available".to_string())
+    }
+}
+
+// Start the discovery server with shutdown support
+async fn start_server_with_shutdown(port: u16, shutdown_tx: broadcast::Sender<()>) -> Result<(), String> {
+    let state: SharedState = Arc::new(RwLock::new(DiscoveryState::default()));
+
+    // Start cleanup task
+    let cleanup_state = state.clone();
+    let mut cleanup_shutdown_rx = shutdown_tx.subscribe();
+    tokio::spawn(async move {
+        tokio::select! {
+            _ = cleanup_stale_peers(cleanup_state) => {}
+            _ = cleanup_shutdown_rx.recv() => {
+                println!("[DISCOVERY] Cleanup task stopped");
+            }
+        }
+    });
+
+    let app = Router::new()
+        .route("/health", get(health))
+        .route("/register", post(register_peer))
+        .route("/unregister", delete(unregister_peer))
+        .route("/peers", get(get_peers))
+        .route("/heartbeat", post(heartbeat))
+        .layer(CorsLayer::permissive())
+        .with_state(state);
+
+    let addr = format!("0.0.0.0:{}", port);
+    println!("[DISCOVERY] Starting server on {}", addr);
+
+    let listener = tokio::net::TcpListener::bind(&addr)
+        .await
+        .map_err(|e| format!("Failed to bind: {}", e))?;
+
+    let mut shutdown_rx = shutdown_tx.subscribe();
+
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async move {
+            let _ = shutdown_rx.recv().await;
+            println!("[DISCOVERY] Server shutting down gracefully");
+        })
+        .await
+        .map_err(|e| format!("Server error: {}", e))?;
+
+    println!("[DISCOVERY] Server stopped");
+    Ok(())
 }

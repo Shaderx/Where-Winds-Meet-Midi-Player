@@ -1,5 +1,6 @@
 <script>
   export let compact = false;
+  export let keybindings = { pause_resume: "F9", previous: "F10", next: "F11" };
   import Icon from '@iconify/svelte';
 
   import {
@@ -31,7 +32,7 @@
     class="text-white/60 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
     on:click={playPrevious}
     disabled={!$isPlaying}
-    title="Previous (F10)"
+    title="Previous ({keybindings.previous})"
   >
     <Icon icon="mdi:skip-previous" class="w-5 h-5" />
   </button>
@@ -40,7 +41,7 @@
   <button
     class="w-8 h-8 rounded-full bg-white hover:scale-105 transition-transform flex items-center justify-center"
     on:click={pauseResume}
-    title="Play/Pause (ScrollLock)"
+    title="Play/Pause ({keybindings.pause_resume})"
   >
     {#if $isPlaying && !$isPaused}
       <Icon icon="mdi:pause" class="w-5 h-5 text-black" />
@@ -54,7 +55,7 @@
     class="text-white/60 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
     on:click={playNext}
     disabled={!$isPlaying}
-    title="Next (F11)"
+    title="Next ({keybindings.next})"
   >
     <Icon icon="mdi:skip-next" class="w-5 h-5" />
   </button>

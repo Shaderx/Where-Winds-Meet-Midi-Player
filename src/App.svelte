@@ -1,5 +1,6 @@
 <script>
   import { onMount } from "svelte";
+  import { fade, fly } from "svelte/transition";
   import { listen } from "@tauri-apps/api/event";
   import { invoke } from "@tauri-apps/api/core";
   import { onDestroy } from "svelte";
@@ -8,10 +9,56 @@
 
   // Current version
   import { APP_VERSION } from "./lib/version.js";
+  import { recordingKeybind } from "./lib/stores/player.js";
 
   // Game window detection
   let gameFound = false;
   let checkInterval;
+
+  // Custom keybindings
+  let keybindings = {
+    pause_resume: "F9",
+    stop: "F12",
+    previous: "F10",
+    next: "F11",
+    mode_prev: "[",
+    mode_next: "]",
+    toggle_mini: "Insert"
+  };
+
+  // Convert key name to event.code for language-independent detection
+  function keyToCode(key) {
+    const upper = key.toUpperCase();
+    // Function keys
+    if (/^F\d{1,2}$/.test(upper)) return upper;
+    // Letters
+    if (/^[A-Z]$/.test(upper)) return `Key${upper}`;
+    // Numbers
+    if (/^[0-9]$/.test(key)) return `Digit${key}`;
+    // Special keys
+    const codeMap = {
+      '[': 'BracketLeft', ']': 'BracketRight',
+      '`': 'Backquote', '-': 'Minus', '=': 'Equal',
+      '\\': 'Backslash', ';': 'Semicolon', "'": 'Quote',
+      ',': 'Comma', '.': 'Period', '/': 'Slash',
+      'INSERT': 'Insert', 'DELETE': 'Delete',
+      'HOME': 'Home', 'END': 'End',
+      'PAGEUP': 'PageUp', 'PAGEDOWN': 'PageDown',
+      'UP': 'ArrowUp', 'DOWN': 'ArrowDown',
+      'LEFT': 'ArrowLeft', 'RIGHT': 'ArrowRight',
+      'SCROLLLOCK': 'ScrollLock', 'PAUSE': 'Pause',
+      'NUMLOCK': 'NumLock', 'PRINTSCREEN': 'PrintScreen',
+    };
+    return codeMap[upper] || codeMap[key] || key;
+  }
+
+  async function loadKeybindings() {
+    try {
+      keybindings = await invoke('cmd_get_keybindings');
+    } catch (e) {
+      console.error("Failed to load keybindings:", e);
+    }
+  }
 
   // Update check
   let updateAvailable = null; // { version, download_url, release_url, file_name }
@@ -116,7 +163,6 @@
     if (savePositionInterval) clearInterval(savePositionInterval);
     saveWindowPosition(); // Save on destroy
   });
-  import { fade, fly } from "svelte/transition";
   import Icon from "@iconify/svelte";
   import appIcon from "./icon.png";
 
@@ -271,12 +317,13 @@
 
   $: navItems = sidebarTab === "music" ? musicNavItems : sidebarTab === "online" ? onlineNavItems : appNavItems;
 
-  const shortcuts = [
-    { action: "Play / Pause", key: "F9" },
-    { action: "Stop", key: "F12 / End" },
-    { action: "Previous", key: "F10" },
-    { action: "Next", key: "F11" },
-    { action: "Mode", key: "[ / ]" },
+  // Reactive shortcuts based on custom keybindings
+  $: shortcuts = [
+    { action: "Play / Pause", key: keybindings.pause_resume },
+    { action: "Stop", key: `${keybindings.stop} / End` },
+    { action: "Previous", key: keybindings.previous },
+    { action: "Next", key: keybindings.next },
+    { action: "Mode", key: `${keybindings.mode_prev} / ${keybindings.mode_next}` },
   ];
 
   // Check if current song is favorited
@@ -312,6 +359,7 @@
   onMount(async () => {
     await loadWindowPosition(); // Restore window position
     await loadMidiFiles();
+    await loadKeybindings(); // Load custom keybindings
     initializeListeners();
     initLibrary(); // Initialize library sharing (auto-connects if was enabled)
     checkForUpdates(); // Check for updates on startup
@@ -326,6 +374,12 @@
       }
     };
     window.addEventListener('open-update-modal', handleOpenUpdateModal);
+
+    // Listen for keybindings changes from SettingsView
+    const handleKeybindingsChanged = (event) => {
+      keybindings = event.detail;
+    };
+    window.addEventListener('keybindings-changed', handleKeybindingsChanged);
 
     // Listen for global shortcut events from Rust backend
     const unlisten = await listen("global-shortcut", async (event) => {
@@ -363,6 +417,7 @@
     return () => {
       unlisten();
       window.removeEventListener('open-update-modal', handleOpenUpdateModal);
+      window.removeEventListener('keybindings-changed', handleKeybindingsChanged);
     };
   });
 
@@ -373,42 +428,40 @@
   };
 
   // Handle keyboard shortcuts when app is focused
+  // Uses event.code for language-independent physical key detection
   async function handleKeydown(event) {
+    // Skip if recording keybind
+    if ($recordingKeybind) return;
+
     // Skip if user is typing in an input
     if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
       return;
     }
 
-    switch (event.key) {
-      case 'F9':
-        event.preventDefault();
-        await pauseResume();
-        break;
-      case 'F10':
-        event.preventDefault();
-        await playPrevious();
-        break;
-      case 'F11':
-        event.preventDefault();
-        await playNext();
-        break;
-      case 'F12':
-      case 'End':
-        event.preventDefault();
-        await stopPlayback();
-        break;
-      case '[':
-        event.preventDefault();
-        prevNoteMode();
-        break;
-      case ']':
-        event.preventDefault();
-        nextNoteMode();
-        break;
-      case 'Insert':
-        event.preventDefault();
-        toggleMiniMode();
-        break;
+    const code = event.code;
+
+    // Check against custom keybindings (converted to event.code format)
+    if (code === keyToCode(keybindings.pause_resume)) {
+      event.preventDefault();
+      await pauseResume();
+    } else if (code === keyToCode(keybindings.stop) || code === 'End') {
+      event.preventDefault();
+      await stopPlayback();
+    } else if (code === keyToCode(keybindings.previous)) {
+      event.preventDefault();
+      await playPrevious();
+    } else if (code === keyToCode(keybindings.next)) {
+      event.preventDefault();
+      await playNext();
+    } else if (code === keyToCode(keybindings.mode_prev)) {
+      event.preventDefault();
+      prevNoteMode();
+    } else if (code === keyToCode(keybindings.mode_next)) {
+      event.preventDefault();
+      nextNoteMode();
+    } else if (code === keyToCode(keybindings.toggle_mini)) {
+      event.preventDefault();
+      toggleMiniMode();
     }
   }
 
@@ -710,7 +763,7 @@
 
           <!-- Player Controls Center -->
           <div class="flex-1 max-w-xl">
-            <PlaybackControls />
+            <PlaybackControls {keybindings} />
             <Timeline />
             <!-- Settings Row -->
             <div class="flex items-center justify-center gap-3 mt-2">
@@ -894,7 +947,7 @@
       {:else}
         <!-- Minimized view -->
         <div class="spotify-player p-4">
-          <PlaybackControls compact={true} />
+          <PlaybackControls compact={true} {keybindings} />
           <Timeline compact={true} />
         </div>
       {/if}

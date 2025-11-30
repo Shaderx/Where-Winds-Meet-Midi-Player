@@ -49,6 +49,9 @@ export const isMinimized = writable(false);
 export const miniMode = writable(false);
 export const smartPause = writable(false);
 
+// Keybinding recording mode (prevents App.svelte from handling keys)
+export const recordingKeybind = writable(false);
+
 // Store previous window size/position for restore
 let previousWindowState = null;
 

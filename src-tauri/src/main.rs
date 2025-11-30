@@ -1,6 +1,42 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::sync::{Arc, Mutex};
+use log::{info, warn, error};
+use simplelog::{WriteLogger, CombinedLogger, TermLogger, LevelFilter, Config, ConfigBuilder, TerminalMode, ColorChoice};
+use std::fs::File;
+
+/// Log macro that prints to console AND logs to file
+#[macro_export]
+macro_rules! app_log {
+    ($($arg:tt)*) => {{
+        println!($($arg)*);
+        log::info!($($arg)*);
+    }};
+}
+
+#[macro_export]
+macro_rules! app_error {
+    ($($arg:tt)*) => {{
+        eprintln!($($arg)*);
+        log::error!($($arg)*);
+    }};
+}
+
+fn init_logger() {
+    let log_path = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.join("wwm-overlay.log")))
+        .unwrap_or_else(|| std::path::PathBuf::from("wwm-overlay.log"));
+
+    let config = ConfigBuilder::new()
+        .set_time_format_rfc3339()
+        .build();
+
+    if let Ok(file) = File::create(&log_path) {
+        let _ = WriteLogger::init(LevelFilter::Info, config, file);
+        info!("=== WWM Overlay Started ===");
+    }
+}
 use std::thread;
 use tauri::{AppHandle, Emitter, State, Window};
 use serde::{Serialize, Deserialize};
@@ -20,6 +56,120 @@ static mut GLOBAL_APP_HANDLE: Option<AppHandle> = None;
 // Global album path (None = default to exe_dir/album)
 use std::sync::RwLock;
 static ALBUM_PATH: RwLock<Option<String>> = RwLock::new(None);
+
+// Keybindings configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeyBindings {
+    pub pause_resume: String,  // Default: "F9"
+    pub stop: String,          // Default: "F12"
+    pub previous: String,      // Default: "F10"
+    pub next: String,          // Default: "F11"
+    pub mode_prev: String,     // Default: "["
+    pub mode_next: String,     // Default: "]"
+    pub toggle_mini: String,   // Default: "Insert"
+}
+
+impl Default for KeyBindings {
+    fn default() -> Self {
+        KeyBindings {
+            pause_resume: "F9".to_string(),
+            stop: "F12".to_string(),
+            previous: "F10".to_string(),
+            next: "F11".to_string(),
+            mode_prev: "[".to_string(),
+            mode_next: "]".to_string(),
+            toggle_mini: "Insert".to_string(),
+        }
+    }
+}
+
+// Global keybindings
+static KEYBINDINGS: RwLock<Option<KeyBindings>> = RwLock::new(None);
+
+fn get_keybindings() -> KeyBindings {
+    KEYBINDINGS.read().unwrap().clone().unwrap_or_default()
+}
+
+fn load_saved_keybindings() {
+    let config = load_config();
+    if let Some(kb) = config.get("keybindings") {
+        if let Ok(keybindings) = serde_json::from_value::<KeyBindings>(kb.clone()) {
+            if let Ok(mut guard) = KEYBINDINGS.write() {
+                *guard = Some(keybindings);
+                app_log!("Loaded custom keybindings");
+            }
+        }
+    }
+}
+
+fn save_keybindings(keybindings: &KeyBindings) {
+    let mut config = load_config();
+    config["keybindings"] = serde_json::to_value(keybindings).unwrap_or_default();
+    save_config(&config);
+    if let Ok(mut guard) = KEYBINDINGS.write() {
+        *guard = Some(keybindings.clone());
+    }
+}
+
+// Convert key string to virtual key code
+fn key_to_vk(key: &str) -> Option<u32> {
+    let upper = key.to_uppercase();
+    match upper.as_str() {
+        // Function keys
+        "F1" => Some(0x70), "F2" => Some(0x71), "F3" => Some(0x72), "F4" => Some(0x73),
+        "F5" => Some(0x74), "F6" => Some(0x75), "F7" => Some(0x76), "F8" => Some(0x77),
+        "F9" => Some(0x78), "F10" => Some(0x79), "F11" => Some(0x7A), "F12" => Some(0x7B),
+        // Special keys
+        "INSERT" | "INS" => Some(0x2D),
+        "DELETE" | "DEL" => Some(0x2E),
+        "HOME" => Some(0x24),
+        "END" => Some(0x23),
+        "PAGEUP" | "PGUP" => Some(0x21),
+        "PAGEDOWN" | "PGDN" => Some(0x22),
+        "SCROLLLOCK" => Some(0x91),
+        "PAUSE" => Some(0x13),
+        "NUMLOCK" => Some(0x90),
+        "PRINTSCREEN" => Some(0x2C),
+        // Arrow keys
+        "UP" | "ARROWUP" => Some(0x26),
+        "DOWN" | "ARROWDOWN" => Some(0x28),
+        "LEFT" | "ARROWLEFT" => Some(0x25),
+        "RIGHT" | "ARROWRIGHT" => Some(0x27),
+        // OEM keys (symbols)
+        "[" | "OEM_4" => Some(0xDB),
+        "]" | "OEM_6" => Some(0xDD),
+        "`" | "OEM_3" => Some(0xC0),
+        "-" | "OEM_MINUS" => Some(0xBD),
+        "=" | "OEM_PLUS" => Some(0xBB),
+        "\\" | "OEM_5" => Some(0xDC),
+        ";" | "OEM_1" => Some(0xBA),
+        "'" | "OEM_7" => Some(0xDE),
+        "," | "OEM_COMMA" => Some(0xBC),
+        "." | "OEM_PERIOD" => Some(0xBE),
+        "/" | "OEM_2" => Some(0xBF),
+        // Letters A-Z (VK codes 0x41-0x5A)
+        "A" => Some(0x41), "B" => Some(0x42), "C" => Some(0x43), "D" => Some(0x44),
+        "E" => Some(0x45), "F" => Some(0x46), "G" => Some(0x47), "H" => Some(0x48),
+        "I" => Some(0x49), "J" => Some(0x4A), "K" => Some(0x4B), "L" => Some(0x4C),
+        "M" => Some(0x4D), "N" => Some(0x4E), "O" => Some(0x4F), "P" => Some(0x50),
+        "Q" => Some(0x51), "R" => Some(0x52), "S" => Some(0x53), "T" => Some(0x54),
+        "U" => Some(0x55), "V" => Some(0x56), "W" => Some(0x57), "X" => Some(0x58),
+        "Y" => Some(0x59), "Z" => Some(0x5A),
+        // Numbers 0-9 (VK codes 0x30-0x39)
+        "0" => Some(0x30), "1" => Some(0x31), "2" => Some(0x32), "3" => Some(0x33),
+        "4" => Some(0x34), "5" => Some(0x35), "6" => Some(0x36), "7" => Some(0x37),
+        "8" => Some(0x38), "9" => Some(0x39),
+        // Numpad keys
+        "NUMPAD0" => Some(0x60), "NUMPAD1" => Some(0x61), "NUMPAD2" => Some(0x62),
+        "NUMPAD3" => Some(0x63), "NUMPAD4" => Some(0x64), "NUMPAD5" => Some(0x65),
+        "NUMPAD6" => Some(0x66), "NUMPAD7" => Some(0x67), "NUMPAD8" => Some(0x68),
+        "NUMPAD9" => Some(0x69),
+        "NUMPADMULTIPLY" => Some(0x6A), "NUMPADADD" => Some(0x6B),
+        "NUMPADSUBTRACT" => Some(0x6D), "NUMPADDECIMAL" => Some(0x6E),
+        "NUMPADDIVIDE" => Some(0x6F),
+        _ => None,
+    }
+}
 
 fn get_config_path() -> Result<std::path::PathBuf, String> {
     let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
@@ -55,7 +205,7 @@ fn load_saved_album_path() {
         if path_buf.exists() {
             if let Ok(mut guard) = ALBUM_PATH.write() {
                 *guard = Some(path.to_string());
-                println!("Loaded album path: {}", path);
+                app_log!("Loaded album path: {}", path);
             }
         }
     }
@@ -74,7 +224,7 @@ fn load_saved_qwertz_mode() {
     let config = load_config();
     if let Some(enabled) = config["qwertz_mode"].as_bool() {
         keyboard::set_qwertz_mode(enabled);
-        println!("Loaded QWERTZ mode: {}", enabled);
+        app_log!("Loaded QWERTZ mode: {}", enabled);
     }
 }
 
@@ -92,7 +242,7 @@ fn load_custom_window_keywords() {
             .filter_map(|v| v.as_str().map(String::from))
             .collect();
         keyboard::set_custom_window_keywords(kw);
-        println!("Loaded custom window keywords");
+        app_log!("Loaded custom window keywords");
     }
 }
 
@@ -531,6 +681,45 @@ async fn set_custom_window_keywords(keywords: Vec<String>) -> Result<(), String>
 #[tauri::command]
 async fn get_custom_window_keywords() -> Result<Vec<String>, String> {
     Ok(keyboard::get_custom_window_keywords())
+}
+
+#[tauri::command]
+async fn cmd_get_keybindings() -> Result<KeyBindings, String> {
+    Ok(get_keybindings())
+}
+
+#[tauri::command]
+async fn cmd_set_keybindings(keybindings: KeyBindings) -> Result<(), String> {
+    save_keybindings(&keybindings);
+    cache_keybinding_vks(); // Hot reload
+    Ok(())
+}
+
+#[tauri::command]
+async fn cmd_reset_keybindings() -> Result<KeyBindings, String> {
+    let default_kb = KeyBindings::default();
+    save_keybindings(&default_kb);
+    cache_keybinding_vks(); // Hot reload
+    Ok(default_kb)
+}
+
+#[tauri::command]
+async fn cmd_set_keybindings_enabled(enabled: bool) -> Result<(), String> {
+    unsafe {
+        KEYBINDINGS_DISABLED = !enabled;
+        RECORDING_MODE = !enabled;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn cmd_unfocus_window() -> Result<(), String> {
+    use windows::Win32::UI::WindowsAndMessaging::{GetDesktopWindow, SetForegroundWindow};
+    unsafe {
+        let desktop = GetDesktopWindow();
+        let _ = SetForegroundWindow(desktop);
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -1347,8 +1536,8 @@ async fn download_update(download_url: String, file_name: String) -> Result<Stri
     let temp_dir = std::env::temp_dir();
     let download_path = temp_dir.join(&file_name);
 
-    println!("[UPDATE] Downloading from: {}", download_url);
-    println!("[UPDATE] Saving to: {:?}", download_path);
+    app_log!("[UPDATE] Downloading from: {}", download_url);
+    app_log!("[UPDATE] Saving to: {:?}", download_path);
 
     let response = ureq::get(&download_url)
         .set("User-Agent", "WWM-Overlay")
@@ -1364,7 +1553,7 @@ async fn download_update(download_url: String, file_name: String) -> Result<Stri
     std::fs::write(&download_path, &bytes)
         .map_err(|e| format!("Failed to save update: {}", e))?;
 
-    println!("[UPDATE] Downloaded {} bytes", bytes.len());
+    app_log!("[UPDATE] Downloaded {} bytes", bytes.len());
 
     Ok(download_path.to_string_lossy().to_string())
 }
@@ -1375,7 +1564,7 @@ async fn download_update(download_url: String, file_name: String) -> Result<Stri
 async fn start_discovery_server(port: u16) -> Result<(), String> {
     tokio::spawn(async move {
         if let Err(e) = discovery::start_discovery_server(port).await {
-            eprintln!("[DISCOVERY] Server error: {}", e);
+            app_error!("[DISCOVERY] Server error: {}", e);
         }
     });
 
@@ -1392,6 +1581,11 @@ async fn start_discovery_server(port: u16) -> Result<(), String> {
 #[tauri::command]
 async fn is_discovery_server_running() -> Result<bool, String> {
     Ok(discovery::is_server_running())
+}
+
+#[tauri::command]
+async fn stop_discovery_server() -> Result<(), String> {
+    discovery::stop_discovery_server()
 }
 
 #[tauri::command]
@@ -1482,7 +1676,7 @@ async fn export_favorites(
         let path = match fav["path"].as_str() {
             Some(p) if !p.is_empty() => p,
             _ => {
-                println!("[EXPORT] Skipping favorite without path: {:?}", fav["name"]);
+                app_log!("[EXPORT] Skipping favorite without path: {:?}", fav["name"]);
                 continue;
             }
         };
@@ -1493,7 +1687,7 @@ async fn export_favorites(
 
         let source_path = std::path::Path::new(path);
         if !source_path.exists() {
-            println!("[EXPORT] File not found, skipping: {}", path);
+            app_log!("[EXPORT] File not found, skipping: {}", path);
             continue;
         }
 
@@ -1520,7 +1714,7 @@ async fn export_favorites(
             note_density,
         });
 
-        println!("[EXPORT] Added: {} -> {}", name, filename);
+        app_log!("[EXPORT] Added: {} -> {}", name, filename);
     }
 
     // Add metadata JSON
@@ -1569,7 +1763,7 @@ async fn export_playlist(
         let path = match track["path"].as_str() {
             Some(p) if !p.is_empty() => p,
             _ => {
-                println!("[EXPORT] Skipping track without path: {:?}", track["name"]);
+                app_log!("[EXPORT] Skipping track without path: {:?}", track["name"]);
                 continue;
             }
         };
@@ -1580,7 +1774,7 @@ async fn export_playlist(
 
         let source_path = std::path::Path::new(path);
         if !source_path.exists() {
-            println!("[EXPORT] File not found, skipping: {}", path);
+            app_log!("[EXPORT] File not found, skipping: {}", path);
             continue;
         }
 
@@ -1607,7 +1801,7 @@ async fn export_playlist(
             note_density,
         });
 
-        println!("[EXPORT] Added: {} -> {}", name, filename);
+        app_log!("[EXPORT] Added: {} -> {}", name, filename);
     }
 
     // Add metadata JSON
@@ -1754,7 +1948,7 @@ async fn import_zip(zip_path: String) -> Result<ImportResult, String> {
 
         // Verify it's a valid MIDI file
         if contents.len() < 4 || &contents[0..4] != b"MThd" {
-            println!("[IMPORT] Skipping invalid MIDI: {}", filename);
+            app_log!("[IMPORT] Skipping invalid MIDI: {}", filename);
             continue;
         }
 
@@ -1763,7 +1957,7 @@ async fn import_zip(zip_path: String) -> Result<ImportResult, String> {
 
         // Check if file with same hash already exists
         if let Some(existing) = existing_files.get(&file_hash).cloned() {
-            println!("[IMPORT] Skipping duplicate (hash exists): {} -> {}", filename, existing.path);
+            app_log!("[IMPORT] Skipping duplicate (hash exists): {} -> {}", filename, existing.path);
             imported_files.push(existing);
             continue;
         }
@@ -1804,7 +1998,7 @@ async fn import_zip(zip_path: String) -> Result<ImportResult, String> {
             size: file_size,
         });
 
-        println!("[IMPORT] Imported: {}", save_path.to_string_lossy());
+        app_log!("[IMPORT] Imported: {}", save_path.to_string_lossy());
     }
 
     Ok(ImportResult {
@@ -1837,7 +2031,7 @@ fn chrono_now() -> String {
 
 #[tauri::command]
 async fn install_update(zip_path: String, app_handle: AppHandle) -> Result<(), String> {
-    println!("[UPDATE] Installing from: {}", zip_path);
+    app_log!("[UPDATE] Installing from: {}", zip_path);
 
     let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
     let exe_dir = exe_path.parent().ok_or("Failed to get exe directory")?;
@@ -1864,7 +2058,7 @@ del "%~f0"
     std::fs::write(&script_path, &script_content)
         .map_err(|e| format!("Failed to create update script: {}", e))?;
 
-    println!("[UPDATE] Created update script at: {:?}", script_path);
+    app_log!("[UPDATE] Created update script at: {:?}", script_path);
 
     // Start the update script
     std::process::Command::new("cmd")
@@ -1873,46 +2067,102 @@ del "%~f0"
         .map_err(|e| format!("Failed to start update script: {}", e))?;
 
     // Exit the app
-    println!("[UPDATE] Exiting for update...");
+    app_log!("[UPDATE] Exiting for update...");
     app_handle.exit(0);
 
     Ok(())
 }
 
-fn register_global_hotkeys() -> Vec<(&'static str, bool)> {
+fn register_global_hotkeys() -> Vec<(String, bool)> {
     let mut results = Vec::new();
+    let kb = get_keybindings();
 
     unsafe {
-        // F9 - Pause/Resume
-        let result = RegisterHotKey(None, HOTKEY_PAUSE_RESUME, MOD_NOREPEAT, VK_F9.0 as u32);
-        results.push(("F9 (Pause/Resume)", result.is_ok()));
+        // Pause/Resume
+        if let Some(vk) = key_to_vk(&kb.pause_resume) {
+            let result = RegisterHotKey(None, HOTKEY_PAUSE_RESUME, MOD_NOREPEAT, vk);
+            results.push((format!("{} (Pause/Resume)", kb.pause_resume), result.is_ok()));
+        }
 
-        // End - Stop
+        // Stop - also register End as backup
+        if let Some(vk) = key_to_vk(&kb.stop) {
+            let result = RegisterHotKey(None, HOTKEY_STOP_F12, MOD_NOREPEAT, vk);
+            results.push((format!("{} (Stop)", kb.stop), result.is_ok()));
+        }
         let result = RegisterHotKey(None, HOTKEY_STOP_END, MOD_NOREPEAT, VK_END.0 as u32);
-        results.push(("End (Stop)", result.is_ok()));
+        results.push(("End (Stop backup)".to_string(), result.is_ok()));
 
-        // F12 - Stop (may fail if another app has it registered)
-        let result = RegisterHotKey(None, HOTKEY_STOP_F12, MOD_NOREPEAT, VK_F12.0 as u32);
-        results.push(("F12 (Stop)", result.is_ok()));
+        // Previous
+        if let Some(vk) = key_to_vk(&kb.previous) {
+            let result = RegisterHotKey(None, HOTKEY_PREV_F10, MOD_NOREPEAT, vk);
+            results.push((format!("{} (Previous)", kb.previous), result.is_ok()));
+        }
 
-        // F10 - Previous
-        let result = RegisterHotKey(None, HOTKEY_PREV_F10, MOD_NOREPEAT, VK_F10.0 as u32);
-        results.push(("F10 (Previous)", result.is_ok()));
-
-        // F11 - Next
-        let result = RegisterHotKey(None, HOTKEY_NEXT_F11, MOD_NOREPEAT, VK_F11.0 as u32);
-        results.push(("F11 (Next)", result.is_ok()));
+        // Next
+        if let Some(vk) = key_to_vk(&kb.next) {
+            let result = RegisterHotKey(None, HOTKEY_NEXT_F11, MOD_NOREPEAT, vk);
+            results.push((format!("{} (Next)", kb.next), result.is_ok()));
+        }
     }
 
     results
 }
 
-// Virtual key codes for [ and ]
-const VK_OEM_4: u32 = 0xDB; // [ key
-const VK_OEM_6: u32 = 0xDD; // ] key
-const VK_INSERT: u32 = 0x2D; // Insert key
+// Cached keybinding VK codes for low-level hook
+static mut CACHED_PAUSE_RESUME_VK: u32 = 0x78; // F9
+static mut CACHED_STOP_VK: u32 = 0x7B;         // F12
+static mut CACHED_PREVIOUS_VK: u32 = 0x79;     // F10
+static mut CACHED_NEXT_VK: u32 = 0x7A;         // F11
+static mut CACHED_MODE_PREV_VK: u32 = 0xDB;    // [
+static mut CACHED_MODE_NEXT_VK: u32 = 0xDD;    // ]
+static mut CACHED_TOGGLE_MINI_VK: u32 = 0x2D;  // Insert
+static mut KEYBINDINGS_DISABLED: bool = false; // Disable during recording
+static mut RECORDING_MODE: bool = false;       // When true, emit key names instead of actions
 
-// Low-level keyboard hook callback for F12, mode switching, and mini mode
+// Convert VK code to key name string
+fn vk_to_key(vk: u32) -> Option<String> {
+    match vk {
+        0x1B => Some("Escape".into()),
+        0x70 => Some("F1".into()), 0x71 => Some("F2".into()), 0x72 => Some("F3".into()), 0x73 => Some("F4".into()),
+        0x74 => Some("F5".into()), 0x75 => Some("F6".into()), 0x76 => Some("F7".into()), 0x77 => Some("F8".into()),
+        0x78 => Some("F9".into()), 0x79 => Some("F10".into()), 0x7A => Some("F11".into()), 0x7B => Some("F12".into()),
+        0x2D => Some("Insert".into()), 0x2E => Some("Delete".into()),
+        0x24 => Some("Home".into()), 0x23 => Some("End".into()),
+        0x21 => Some("PageUp".into()), 0x22 => Some("PageDown".into()),
+        0x91 => Some("ScrollLock".into()), 0x13 => Some("Pause".into()), 0x90 => Some("NumLock".into()),
+        0x2C => Some("PrintScreen".into()),
+        0x26 => Some("Up".into()), 0x28 => Some("Down".into()), 0x25 => Some("Left".into()), 0x27 => Some("Right".into()),
+        0xDB => Some("[".into()), 0xDD => Some("]".into()), 0xC0 => Some("`".into()),
+        0xBD => Some("-".into()), 0xBB => Some("=".into()), 0xDC => Some("\\".into()),
+        0xBA => Some(";".into()), 0xDE => Some("'".into()),
+        0xBC => Some(",".into()), 0xBE => Some(".".into()), 0xBF => Some("/".into()),
+        // Letters A-Z
+        0x41..=0x5A => Some(((b'A' + (vk - 0x41) as u8) as char).to_string()),
+        // Numbers 0-9
+        0x30..=0x39 => Some(((b'0' + (vk - 0x30) as u8) as char).to_string()),
+        // Numpad
+        0x60..=0x69 => Some(format!("Numpad{}", vk - 0x60)),
+        _ => None,
+    }
+}
+
+fn cache_keybinding_vks() {
+    let kb = get_keybindings();
+    unsafe {
+        CACHED_PAUSE_RESUME_VK = key_to_vk(&kb.pause_resume).unwrap_or(0x78);
+        CACHED_STOP_VK = key_to_vk(&kb.stop).unwrap_or(0x7B);
+        CACHED_PREVIOUS_VK = key_to_vk(&kb.previous).unwrap_or(0x79);
+        CACHED_NEXT_VK = key_to_vk(&kb.next).unwrap_or(0x7A);
+        CACHED_MODE_PREV_VK = key_to_vk(&kb.mode_prev).unwrap_or(0xDB);
+        CACHED_MODE_NEXT_VK = key_to_vk(&kb.mode_next).unwrap_or(0xDD);
+        CACHED_TOGGLE_MINI_VK = key_to_vk(&kb.toggle_mini).unwrap_or(0x2D);
+    }
+    app_log!("[KEYBINDINGS] Reloaded: pause={:02X} stop={:02X} prev={:02X} next={:02X}",
+        unsafe { CACHED_PAUSE_RESUME_VK }, unsafe { CACHED_STOP_VK },
+        unsafe { CACHED_PREVIOUS_VK }, unsafe { CACHED_NEXT_VK });
+}
+
+// Low-level keyboard hook callback for all keybindings
 unsafe extern "system" fn low_level_keyboard_proc(
     ncode: i32,
     wparam: windows::Win32::Foundation::WPARAM,
@@ -1924,21 +2174,34 @@ unsafe extern "system" fn low_level_keyboard_proc(
 
         if is_keydown {
             if let Some(ref app_handle) = GLOBAL_APP_HANDLE {
-                // Check if F12 was pressed
-                if kb_struct.vkCode == VK_F12.0 as u32 {
-                    let _ = app_handle.emit("global-shortcut", "stop");
+                let vk = kb_struct.vkCode;
+
+                // Recording mode: emit key name for binding capture
+                if RECORDING_MODE {
+                    // Skip modifier keys
+                    if vk != 0x10 && vk != 0x11 && vk != 0x12 && vk != 0xA0 && vk != 0xA1 && vk != 0xA2 && vk != 0xA3 && vk != 0xA4 && vk != 0xA5 && vk != 0x5B && vk != 0x5C {
+                        if let Some(key_name) = vk_to_key(vk) {
+                            let _ = app_handle.emit("key-captured", key_name);
+                        }
+                    }
                 }
-                // Check if [ was pressed - previous mode
-                else if kb_struct.vkCode == VK_OEM_4 {
-                    let _ = app_handle.emit("global-shortcut", "mode_prev");
-                }
-                // Check if ] was pressed - next mode
-                else if kb_struct.vkCode == VK_OEM_6 {
-                    let _ = app_handle.emit("global-shortcut", "mode_next");
-                }
-                // Check if Insert was pressed - toggle mini mode
-                else if kb_struct.vkCode == VK_INSERT {
-                    let _ = app_handle.emit("global-shortcut", "toggle_mini");
+                // Normal mode: emit actions
+                else if !KEYBINDINGS_DISABLED {
+                    if vk == CACHED_PAUSE_RESUME_VK {
+                        let _ = app_handle.emit("global-shortcut", "pause_resume");
+                    } else if vk == CACHED_STOP_VK || vk == VK_END.0 as u32 {
+                        let _ = app_handle.emit("global-shortcut", "stop");
+                    } else if vk == CACHED_PREVIOUS_VK {
+                        let _ = app_handle.emit("global-shortcut", "previous");
+                    } else if vk == CACHED_NEXT_VK {
+                        let _ = app_handle.emit("global-shortcut", "next");
+                    } else if vk == CACHED_MODE_PREV_VK {
+                        let _ = app_handle.emit("global-shortcut", "mode_prev");
+                    } else if vk == CACHED_MODE_NEXT_VK {
+                        let _ = app_handle.emit("global-shortcut", "mode_next");
+                    } else if vk == CACHED_TOGGLE_MINI_VK {
+                        let _ = app_handle.emit("global-shortcut", "toggle_mini");
+                    }
                 }
             }
         }
@@ -1948,6 +2211,9 @@ unsafe extern "system" fn low_level_keyboard_proc(
 }
 
 fn start_hotkey_listener(app_handle: AppHandle) {
+    // Cache keybinding VK codes for low-level hook
+    cache_keybinding_vks();
+
     // Store app handle globally for the low-level hook callback
     unsafe {
         GLOBAL_APP_HANDLE = Some(app_handle.clone());
@@ -1978,7 +2244,7 @@ fn start_hotkey_listener(app_handle: AppHandle) {
             );
 
             if hook.is_err() {
-                eprintln!("Failed to install low-level keyboard hook for F12");
+                app_error!("Failed to install low-level keyboard hook for F12");
             } else {
                 println!("  ✓ Low-level keyboard hook installed (F12 fallback)");
             }
@@ -1994,7 +2260,7 @@ fn start_hotkey_listener(app_handle: AppHandle) {
                 let result = GetMessageW(&mut msg, None, 0, 0);
 
                 if result.0 == -1 {
-                    eprintln!("GetMessageW error");
+                    app_error!("GetMessageW error");
                     break;
                 }
                 if result.0 == 0 {
@@ -2002,7 +2268,7 @@ fn start_hotkey_listener(app_handle: AppHandle) {
                     break;
                 }
 
-                if msg.message == WM_HOTKEY {
+                if msg.message == WM_HOTKEY && !KEYBINDINGS_DISABLED {
                     let hotkey_id = msg.wParam.0 as i32;
 
                     let action = match hotkey_id {
@@ -2031,12 +2297,15 @@ fn set_high_priority() {
         if SetPriorityClass(process, HIGH_PRIORITY_CLASS).is_ok() {
             println!("Process priority set to HIGH");
         } else {
-            eprintln!("Failed to set process priority to HIGH");
+            app_error!("Failed to set process priority to HIGH");
         }
     }
 }
 
 fn main() {
+    // Initialize logging first
+    init_logger();
+
     // Set high priority for accurate MIDI timing
     set_high_priority();
 
@@ -2044,6 +2313,7 @@ fn main() {
     load_saved_album_path();
     load_saved_qwertz_mode();
     load_custom_window_keywords();
+    load_saved_keybindings();
 
     let app_state = Arc::new(Mutex::new(AppState::new()));
 
@@ -2080,6 +2350,11 @@ fn main() {
             get_qwertz_mode,
             set_custom_window_keywords,
             get_custom_window_keywords,
+            cmd_get_keybindings,
+            cmd_set_keybindings,
+            cmd_reset_keybindings,
+            cmd_set_keybindings_enabled,
+            cmd_unfocus_window,
             press_key,
             is_game_focused,
             is_game_window_found,
@@ -2113,6 +2388,7 @@ fn main() {
             install_update,
             start_discovery_server,
             is_discovery_server_running,
+            stop_discovery_server,
             load_favorites,
             save_favorites,
             load_playlists,

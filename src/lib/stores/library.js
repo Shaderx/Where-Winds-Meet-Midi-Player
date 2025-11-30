@@ -526,6 +526,20 @@ export async function startServer(port = 3456) {
   }
 }
 
+// Stop discovery server
+export async function stopServer() {
+  try {
+    await invoke('stop_discovery_server');
+    isHostingServer.set(false);
+    console.log('[LIBRARY] Discovery server stopped');
+    return true;
+  } catch (err) {
+    console.error('[LIBRARY] Failed to stop server:', err);
+    libraryError.set(err.toString());
+    return false;
+  }
+}
+
 // Initialize library
 export function initLibrary() {
   if (initialized) return;

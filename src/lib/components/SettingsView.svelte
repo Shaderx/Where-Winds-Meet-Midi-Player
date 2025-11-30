@@ -2,8 +2,10 @@
   import Icon from "@iconify/svelte";
   import { fade, fly } from "svelte/transition";
   import { invoke } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
   import { open } from "@tauri-apps/plugin-dialog";
-  import { onMount } from "svelte";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { onMount, onDestroy } from "svelte";
   import {
     noteMode,
     setNoteMode,
@@ -44,8 +46,31 @@
   let newKeyword = "";
   let searchQuery = "";
 
+  // Keybindings
+  let keybindings = {
+    pause_resume: "F9",
+    stop: "F12",
+    previous: "F10",
+    next: "F11",
+    mode_prev: "[",
+    mode_next: "]",
+    toggle_mini: "Insert"
+  };
+  let recordingKey = null; // Which key we're currently recording
+
+  const keybindingLabels = {
+    pause_resume: "Play / Pause",
+    stop: "Stop",
+    previous: "Previous Track",
+    next: "Next Track",
+    mode_prev: "Mode Prev",
+    mode_next: "Mode Next",
+    toggle_mini: "Mini Mode"
+  };
+
   // Settings sections for search/navigation
   const settingsSections = [
+    { id: "keybindings", label: "Keybindings", icon: "mdi:keyboard-settings", keywords: ["keybindings", "shortcuts", "hotkeys", "keys", "bind"] },
     { id: "window", label: "Window", icon: "mdi:application-outline", keywords: ["window", "detection", "process", "game"] },
     { id: "notemode", label: "Note Mode", icon: "mdi:music-note", keywords: ["note", "mode", "calculation", "mapping"] },
     { id: "keystyle", label: "Key Style", icon: "mdi:piano", keywords: ["key", "style", "play", "21", "36"] },
@@ -77,7 +102,29 @@
 
   const isDev = import.meta.env.DEV;
 
+  // Key capture event listener cleanup
+  let unlistenKeyCapture = null;
+
+  // Re-enable keybindings when leaving settings (in case user was recording)
+  onDestroy(() => {
+    invoke('cmd_set_keybindings_enabled', { enabled: true }).catch(() => {});
+    if (unlistenKeyCapture) unlistenKeyCapture();
+  });
+
   onMount(async () => {
+    // Listen for key capture events from backend (when app not focused)
+    unlistenKeyCapture = await listen('key-captured', (event) => {
+      if (!recordingKey) return;
+      const keyName = event.payload;
+
+      if (keyName === 'Escape') {
+        stopRecording();
+        return;
+      }
+
+      applyKeyBinding(keyName);
+    });
+
     // Check initial scroll state
     setTimeout(() => {
       if (scrollContainer) {
@@ -114,9 +161,77 @@
       console.error("Failed to get custom window keywords:", e);
     }
 
+    // Load keybindings
+    try {
+      keybindings = await invoke('cmd_get_keybindings');
+    } catch (e) {
+      console.error("Failed to get keybindings:", e);
+    }
+
     // Check for updates
     checkForUpdates();
   });
+
+  async function saveKeybindings() {
+    try {
+      await invoke('cmd_set_keybindings', { keybindings });
+      // Notify App.svelte to reload keybindings
+      window.dispatchEvent(new CustomEvent('keybindings-changed', { detail: keybindings }));
+    } catch (e) {
+      console.error("Failed to save keybindings:", e);
+    }
+  }
+
+  async function resetKeybindings() {
+    try {
+      keybindings = await invoke('cmd_reset_keybindings');
+      // Notify App.svelte to reload keybindings
+      window.dispatchEvent(new CustomEvent('keybindings-changed', { detail: keybindings }));
+    } catch (e) {
+      console.error("Failed to reset keybindings:", e);
+    }
+  }
+
+  async function startRecording(key) {
+    await invoke('cmd_set_keybindings_enabled', { enabled: false });
+    recordingKey = key;
+    // Unfocus app so low-level hook can capture keys
+    await invoke('cmd_unfocus_window');
+  }
+
+  async function stopRecording() {
+    recordingKey = null;
+    await invoke('cmd_set_keybindings_enabled', { enabled: true });
+    // Refocus window
+    const win = getCurrentWindow();
+    await win.setFocus(true).catch(() => {});
+  }
+
+  // Apply key binding with smart swap
+  function applyKeyBinding(keyName) {
+    if (!recordingKey) return;
+
+    const oldKey = keybindings[recordingKey];
+    const conflictAction = Object.entries(keybindings).find(
+      ([action, boundKey]) => boundKey === keyName && action !== recordingKey
+    );
+
+    if (conflictAction) {
+      keybindings = {
+        ...keybindings,
+        [conflictAction[0]]: oldKey,
+        [recordingKey]: keyName
+      };
+    } else {
+      keybindings = {
+        ...keybindings,
+        [recordingKey]: keyName
+      };
+    }
+
+    stopRecording();
+    saveKeybindings();
+  }
 
   async function checkForUpdates() {
     try {
@@ -341,6 +456,8 @@
   }
 </script>
 
+
+
 <div class="h-full flex flex-col">
   <!-- Header -->
   <div class="mb-4">
@@ -382,6 +499,48 @@
     onscroll={handleScroll}
     class="flex-1 overflow-y-auto space-y-6 pr-2 {showTopMask && showBottomMask ? 'scroll-mask-both' : showTopMask ? 'scroll-mask-top' : showBottomMask ? 'scroll-mask-bottom' : ''}"
   >
+    <!-- Keybindings Section -->
+    <div
+      id="settings-keybindings"
+      class="bg-white/5 rounded-xl p-4 scroll-mt-4"
+      in:fly={{ y: 10, duration: 200 }}
+    >
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+          <Icon icon="mdi:keyboard-settings" class="w-5 h-5 text-[#1db954]" />
+          <h3 class="text-lg font-semibold">Keybindings</h3>
+        </div>
+        <button
+          class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white/60 hover:text-white text-xs font-medium transition-colors"
+          onclick={resetKeybindings}
+        >
+          Reset to Default
+        </button>
+      </div>
+
+      <p class="text-sm text-white/60 mb-4">
+        Click a key to change it. Press Escape to cancel. Changes apply instantly.
+      </p>
+
+      <div class="grid grid-cols-2 gap-3">
+        {#each Object.entries(keybindingLabels) as [key, label]}
+          <div class="flex items-center justify-between bg-white/5 rounded-lg p-3">
+            <span class="text-sm text-white/80">{label}</span>
+            <button
+              class="px-3 py-1.5 rounded-md font-mono text-sm min-w-[60px] text-center transition-all {recordingKey === key ? 'bg-[#1db954] text-black animate-pulse' : 'bg-white/10 hover:bg-white/20 text-white'}"
+              onclick={() => startRecording(key)}
+            >
+              {recordingKey === key ? '...' : keybindings[key]}
+            </button>
+          </div>
+        {/each}
+      </div>
+
+      <p class="text-xs text-white/40 mt-3">
+        Supported: F1-F12, A-Z, 0-9, Arrow keys, Insert, Delete, Home, End, PageUp/Down, Numpad, [ ] ` - = \ ; ' , . /
+      </p>
+    </div>
+
     <!-- Window Detection Section -->
     <div
       id="settings-window"

@@ -24,6 +24,7 @@
     discoveryServerUrl,
     setDiscoveryServer,
     startServer,
+    stopServer,
     isHostingServer,
   } from "../stores/library.js";
   import { midiFiles } from "../stores/player.js";
@@ -119,6 +120,10 @@
 
   async function handleStartServer() {
     await startServer(serverPort);
+  }
+
+  async function handleStopServer() {
+    await stopServer();
   }
 </script>
 
@@ -224,13 +229,21 @@
                     placeholder="3456"
                     class="w-20 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-[#1db954]"
                   />
-                  <button
-                    class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors {$isHostingServer ? 'bg-green-500/20 text-green-400' : 'bg-white/10 hover:bg-white/20 text-white'}"
-                    onclick={handleStartServer}
-                    disabled={$isHostingServer}
-                  >
-                    {$isHostingServer ? 'Server Running' : 'Start Server'}
-                  </button>
+                  {#if $isHostingServer}
+                    <button
+                      class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                      onclick={handleStopServer}
+                    >
+                      Stop Server
+                    </button>
+                  {:else}
+                    <button
+                      class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-white/10 hover:bg-white/20 text-white"
+                      onclick={handleStartServer}
+                    >
+                      Start Server
+                    </button>
+                  {/if}
                 </div>
                 <p class="text-xs text-white/40">Run a discovery server on this machine</p>
               </div>
@@ -363,13 +376,21 @@
                     placeholder="3456"
                     class="w-20 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-[#1db954]"
                   />
-                  <button
-                    class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors {$isHostingServer ? 'bg-green-500/20 text-green-400' : 'bg-white/10 hover:bg-white/20 text-white'}"
-                    onclick={handleStartServer}
-                    disabled={$isHostingServer}
-                  >
-                    {$isHostingServer ? 'Server Running' : 'Start Server'}
-                  </button>
+                  {#if $isHostingServer}
+                    <button
+                      class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                      onclick={handleStopServer}
+                    >
+                      Stop Server
+                    </button>
+                  {:else}
+                    <button
+                      class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-white/10 hover:bg-white/20 text-white"
+                      onclick={handleStartServer}
+                    >
+                      Start Server
+                    </button>
+                  {/if}
                 </div>
                 <p class="text-xs text-white/40">Run a discovery server on this machine</p>
               </div>
