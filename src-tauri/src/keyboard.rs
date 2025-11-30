@@ -5,8 +5,8 @@ use std::sync::atomic::{AtomicU64, AtomicIsize, AtomicBool, Ordering};
 use std::time::{Instant, Duration};
 use std::sync::Mutex;
 
-// Configurable modifier delay in milliseconds (default 2ms)
-static MODIFIER_DELAY_MS: AtomicU64 = AtomicU64::new(2);
+// Configurable modifier delay in milliseconds (default 0ms = instant)
+static MODIFIER_DELAY_MS: AtomicU64 = AtomicU64::new(0);
 
 // Input mode: false = PostMessage (default), true = SendInput (for cloud gaming)
 static USE_SEND_INPUT: AtomicBool = AtomicBool::new(false);
@@ -360,6 +360,80 @@ fn send_input_key_up(vk: u32) {
     }
 }
 
+/// Send modifier + key down in a single atomic SendInput call (instant, no delay)
+#[cfg(target_os = "windows")]
+fn send_input_combo_down(mod_vk: u32, key_vk: u32) {
+    unsafe {
+        let mod_scan = MapVirtualKeyW(mod_vk, MAPVK_VK_TO_VSC) as u16;
+        let key_scan = MapVirtualKeyW(key_vk, MAPVK_VK_TO_VSC) as u16;
+
+        let inputs = [
+            INPUT {
+                r#type: INPUT_KEYBOARD,
+                Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 {
+                    ki: KEYBDINPUT {
+                        wVk: windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY(mod_vk as u16),
+                        wScan: mod_scan,
+                        dwFlags: KEYEVENTF_SCANCODE,
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
+                },
+            },
+            INPUT {
+                r#type: INPUT_KEYBOARD,
+                Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 {
+                    ki: KEYBDINPUT {
+                        wVk: windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY(key_vk as u16),
+                        wScan: key_scan,
+                        dwFlags: KEYEVENTF_SCANCODE,
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
+                },
+            },
+        ];
+        SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
+/// Send key up + modifier up in a single atomic SendInput call (instant, no delay)
+#[cfg(target_os = "windows")]
+fn send_input_combo_up(key_vk: u32, mod_vk: u32) {
+    unsafe {
+        let key_scan = MapVirtualKeyW(key_vk, MAPVK_VK_TO_VSC) as u16;
+        let mod_scan = MapVirtualKeyW(mod_vk, MAPVK_VK_TO_VSC) as u16;
+
+        let inputs = [
+            INPUT {
+                r#type: INPUT_KEYBOARD,
+                Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 {
+                    ki: KEYBDINPUT {
+                        wVk: windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY(key_vk as u16),
+                        wScan: key_scan,
+                        dwFlags: KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP,
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
+                },
+            },
+            INPUT {
+                r#type: INPUT_KEYBOARD,
+                Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 {
+                    ki: KEYBDINPUT {
+                        wVk: windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY(mod_vk as u16),
+                        wScan: mod_scan,
+                        dwFlags: KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP,
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
+                },
+            },
+        ];
+        SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
 // ============ Key down/up with mode switching ============
 
 #[cfg(target_os = "windows")]
@@ -371,34 +445,27 @@ pub fn key_down(key: &str) {
             if !is_wwm_focused().unwrap_or(false) {
                 return;
             }
-            // Send modifier first if needed
+            // Use atomic combo for modifier keys (instant, no delay)
             if let Some(mod_vk) = modifier_to_vk(modifier) {
-                send_input_key_down(mod_vk);
-                let delay = get_modifier_delay();
-                if delay > 0 {
-                    std::thread::sleep(std::time::Duration::from_millis(delay));
-                }
+                send_input_combo_down(mod_vk, vk);
+            } else {
+                send_input_key_down(vk);
             }
-            send_input_key_down(vk);
         } else {
             // PostMessage mode - targeted to game window
-            match find_game_window() {
-                Some(hwnd) => {
-                    unsafe {
-                        // Send modifier first if needed
-                        if let Some(mod_vk) = modifier_to_vk(modifier) {
-                            let mod_lparam = make_keydown_lparam(mod_vk);
-                            let _ = PostMessageW(hwnd, WM_KEYDOWN, WPARAM(mod_vk as usize), mod_lparam);
-                            let delay = get_modifier_delay();
-                            if delay > 0 {
-                                std::thread::sleep(std::time::Duration::from_millis(delay));
-                            }
-                        }
+            if let Some(hwnd) = find_game_window() {
+                unsafe {
+                    // Send modifier + key instantly (back-to-back, no delay)
+                    if let Some(mod_vk) = modifier_to_vk(modifier) {
+                        let mod_lparam = make_keydown_lparam(mod_vk);
+                        let key_lparam = make_keydown_lparam(vk);
+                        let _ = PostMessageW(hwnd, WM_KEYDOWN, WPARAM(mod_vk as usize), mod_lparam);
+                        let _ = PostMessageW(hwnd, WM_KEYDOWN, WPARAM(vk as usize), key_lparam);
+                    } else {
                         let lparam = make_keydown_lparam(vk);
                         let _ = PostMessageW(hwnd, WM_KEYDOWN, WPARAM(vk as usize), lparam);
                     }
                 }
-                None => {}
             }
         }
     }
@@ -413,28 +480,25 @@ pub fn key_up(key: &str) {
             if !is_wwm_focused().unwrap_or(false) {
                 return;
             }
-            send_input_key_up(vk);
+            // Use atomic combo for modifier keys (instant, no delay)
             if let Some(mod_vk) = modifier_to_vk(modifier) {
-                let delay = get_modifier_delay();
-                if delay > 0 {
-                    std::thread::sleep(std::time::Duration::from_millis(delay));
-                }
-                send_input_key_up(mod_vk);
+                send_input_combo_up(vk, mod_vk);
+            } else {
+                send_input_key_up(vk);
             }
         } else {
             // PostMessage mode - targeted to game window
             if let Some(hwnd) = find_game_window() {
                 unsafe {
-                    let lparam = make_keyup_lparam(vk);
-                    let _ = PostMessageW(hwnd, WM_KEYUP, WPARAM(vk as usize), lparam);
-
+                    // Release key + modifier instantly (back-to-back, no delay)
                     if let Some(mod_vk) = modifier_to_vk(modifier) {
-                        let delay = get_modifier_delay();
-                        if delay > 0 {
-                            std::thread::sleep(std::time::Duration::from_millis(delay));
-                        }
+                        let key_lparam = make_keyup_lparam(vk);
                         let mod_lparam = make_keyup_lparam(mod_vk);
+                        let _ = PostMessageW(hwnd, WM_KEYUP, WPARAM(vk as usize), key_lparam);
                         let _ = PostMessageW(hwnd, WM_KEYUP, WPARAM(mod_vk as usize), mod_lparam);
+                    } else {
+                        let lparam = make_keyup_lparam(vk);
+                        let _ = PostMessageW(hwnd, WM_KEYUP, WPARAM(vk as usize), lparam);
                     }
                 }
             }

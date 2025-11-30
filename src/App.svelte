@@ -221,17 +221,23 @@
 
 
   // Note mode options for quick selector
-  const noteModeOptions = [
-    { id: "Python", title: "YueLyn", short: "YL", icon: "mdi:heart", desc: "YueLyn's favorite play mode" },
+  const noteModeOptionsList = [
+    { id: "Python", title: "YueLyn", short: "YL", icon: "mdi:heart", desc: "YueLyn's favorite play mode", rmd21: true },
     { id: "Closest", short: "CLS", icon: "mdi:target", desc: "Best fit for most songs" },
     { id: "Wide", short: "WDE", icon: "mdi:arrow-expand-horizontal", desc: "Uses high/low rows more" },
-    { id: "Sharps", short: "SHP", icon: "mdi:music-accidental-sharp", desc: "36-key: more Shift/Ctrl" },
+    { id: "Sharps", short: "SHP", icon: "mdi:music-accidental-sharp", desc: "36-key: Shift/Ctrl for sharps", rmd36: true },
     { id: "Quantize", short: "QNT", icon: "mdi:grid", desc: "Snap to scale notes" },
     { id: "TransposeOnly", short: "TRP", icon: "mdi:arrow-up-down", desc: "Direct octave shift" },
     { id: "Pentatonic", short: "PEN", icon: "mdi:music", desc: "5-note scale mapping" },
     { id: "Chromatic", short: "CHR", icon: "mdi:piano", desc: "12 to 7 key mapping" },
     { id: "Raw", short: "RAW", icon: "mdi:code-braces", desc: "1:1 direct, no processing" },
   ];
+
+  // Reactive: show RMD based on key mode
+  $: noteModeOptions = noteModeOptionsList.map(m => ({
+    ...m,
+    isRmd: ($keyMode === 'Keys36' && m.rmd36) || ($keyMode === 'Keys21' && m.rmd21)
+  }));
 
   let showModeMenu = false;
   let showSpeedMenu = false;
@@ -833,7 +839,12 @@
                         >
                           <Icon icon={mode.icon} class="w-4 h-4 flex-shrink-0 {$noteMode === mode.id ? 'text-[#1db954]' : 'text-white/50'}" />
                           <div class="flex-1 min-w-0">
-                            <div class="text-sm font-medium {$noteMode === mode.id ? 'text-[#1db954]' : 'text-white/90'}">{mode.title || mode.id}</div>
+                            <div class="flex items-center gap-1.5 text-sm font-medium {$noteMode === mode.id ? 'text-[#1db954]' : 'text-white/90'}">
+                              {mode.title || mode.id}
+                              {#if mode.isRmd}
+                                <span class="px-1.5 text-[10px] font-semibold bg-[#1db954]/20 text-[#1db954] rounded-full leading-4">RMD</span>
+                              {/if}
+                            </div>
                             <div class="text-xs {$noteMode === mode.id ? 'text-[#1db954]/70' : 'text-white/40'}">{mode.desc}</div>
                           </div>
                           {#if $noteMode === mode.id}

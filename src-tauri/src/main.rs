@@ -767,79 +767,18 @@ async fn test_all_keys_36() -> Result<(), String> {
 
     println!("Testing 36-key mode...");
 
-    // Test low octave
-    println!("Low octave - natural notes:");
-    for key in low_natural {
-        keyboard::key_down(key);
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        keyboard::key_up(key);
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
+    // All 36 keys in order
+    let all_keys: Vec<&str> = [
+        low_natural.as_slice(), low_sharps.as_slice(), low_flats.as_slice(),
+        mid_natural.as_slice(), mid_sharps.as_slice(), mid_flats.as_slice(),
+        high_natural.as_slice(), high_sharps.as_slice(), high_flats.as_slice(),
+    ].concat();
 
-    println!("Low octave - sharps:");
-    for key in low_sharps {
-        keyboard::key_down(key);
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        keyboard::key_up(key);
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
-
-    println!("Low octave - flats:");
-    for key in low_flats {
-        keyboard::key_down(key);
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        keyboard::key_up(key);
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
-
-    // Test mid octave
-    println!("Mid octave - natural notes:");
-    for key in mid_natural {
-        keyboard::key_down(key);
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        keyboard::key_up(key);
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
-
-    println!("Mid octave - sharps:");
-    for key in mid_sharps {
-        keyboard::key_down(key);
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        keyboard::key_up(key);
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
-
-    println!("Mid octave - flats:");
-    for key in mid_flats {
-        keyboard::key_down(key);
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        keyboard::key_up(key);
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
-
-    // Test high octave
-    println!("High octave - natural notes:");
-    for key in high_natural {
-        keyboard::key_down(key);
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        keyboard::key_up(key);
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
-
-    println!("High octave - sharps:");
-    for key in high_sharps {
-        keyboard::key_down(key);
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        keyboard::key_up(key);
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
-
-    println!("High octave - flats:");
-    for key in high_flats {
-        keyboard::key_down(key);
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        keyboard::key_up(key);
-        std::thread::sleep(std::time::Duration::from_millis(50));
+    // Test all keys - instant combo (shift+x together), small gap between notes for UI
+    for key in all_keys {
+        keyboard::key_down(key);  // Shift+X fires together instantly
+        keyboard::key_up(key);    // Release together instantly
+        std::thread::sleep(std::time::Duration::from_millis(50)); // Gap between notes for UI
     }
 
     println!("36-key test complete!");

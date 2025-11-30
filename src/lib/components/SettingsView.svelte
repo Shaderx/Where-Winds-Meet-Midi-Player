@@ -11,8 +11,6 @@
     setNoteMode,
     keyMode,
     setKeyMode,
-    modifierDelay,
-    setModifierDelay,
     testAllKeys,
     testAllKeys36,
     smartPause,
@@ -76,7 +74,6 @@
     { id: "keystyle", label: "Key Style", icon: "mdi:piano", keywords: ["key", "style", "play", "21", "36"] },
     { id: "keyboard", label: "Keyboard", icon: "mdi:keyboard", keywords: ["keyboard", "qwertz", "layout", "german"] },
     { id: "cloud", label: "Cloud", icon: "mdi:cloud", keywords: ["cloud", "gaming", "geforce", "input"] },
-    { id: "playback", label: "Playback", icon: "mdi:play-circle", keywords: ["playback", "modifier", "delay", "speed"] },
     { id: "storage", label: "Storage", icon: "mdi:folder", keywords: ["storage", "album", "folder", "path"] },
     { id: "debug", label: "Debug", icon: "mdi:bug", keywords: ["debug", "test", "keys", "spam"] },
   ];
@@ -375,53 +372,23 @@
   }
 
   // Note calculation mode options
-  const noteModes = [
-    {
-      id: "Python",
-      name: "YueLyn (Recommended)",
-      description: "YueLyn most fav play mode",
-    },
-    {
-      id: "Closest",
-      name: "Closest",
-      description: "Find closest available note (original, best for most songs)",
-    },
-    {
-      id: "Wide",
-      name: "Wide",
-      description: "Uses high and low rows more often (spreads notes across all octaves)",
-    },
-    {
-      id: "Sharps",
-      name: "Sharps (36-key)",
-      description: "Uses more Shift/Ctrl modifiers in 36-key mode (shifts notes to sharps)",
-    },
-    {
-      id: "Quantize",
-      name: "Quantize",
-      description: "Snap to exact scale notes only",
-    },
-    {
-      id: "TransposeOnly",
-      name: "Transpose Only",
-      description: "Direct mapping with octave shifting",
-    },
-    {
-      id: "Pentatonic",
-      name: "Pentatonic",
-      description: "Map to 5-note pentatonic scale (do-re-mi-so-la)",
-    },
-    {
-      id: "Chromatic",
-      name: "Chromatic",
-      description: "Detailed 12-semitone to 7-key mapping",
-    },
-    {
-      id: "Raw",
-      name: "Raw",
-      description: "Direct 1:1 mapping, no auto-transpose (MIDI note % 21)",
-    },
+  const noteModesList = [
+    { id: "Python", name: "YueLyn", description: "YueLyn most fav play mode", rmd21: true },
+    { id: "Closest", name: "Closest", description: "Find closest available note (best for most songs)" },
+    { id: "Wide", name: "Wide", description: "Uses high and low rows more (spreads notes across octaves)" },
+    { id: "Sharps", name: "Sharps", description: "Uses Shift/Ctrl for sharps/flats", rmd36: true },
+    { id: "Quantize", name: "Quantize", description: "Snap to exact scale notes only" },
+    { id: "TransposeOnly", name: "Transpose Only", description: "Direct mapping with octave shifting" },
+    { id: "Pentatonic", name: "Pentatonic", description: "Map to 5-note pentatonic scale (do-re-mi-so-la)" },
+    { id: "Chromatic", name: "Chromatic", description: "Detailed 12-semitone to 7-key mapping" },
+    { id: "Raw", name: "Raw", description: "Direct 1:1 mapping, no auto-transpose (MIDI note % 21)" },
   ];
+
+  // Reactive: show RMD based on key mode
+  $: noteModes = noteModesList.map(m => ({
+    ...m,
+    isRmd: ($keyMode === 'Keys36' && m.rmd36) || ($keyMode === 'Keys21' && m.rmd21)
+  }));
 
   async function handleModeChange(mode) {
     await setNoteMode(mode);
@@ -630,7 +597,12 @@
             onclick={() => handleModeChange(mode.id)}
           >
             <div class="flex items-center justify-between mb-2">
-              <span class="font-semibold text-white">{mode.name}</span>
+              <div class="flex items-center gap-2">
+                <span class="font-semibold text-white">{mode.name}</span>
+                {#if mode.isRmd}
+                  <span class="px-1.5 text-[10px] font-semibold bg-[#1db954]/20 text-[#1db954] rounded-full leading-4">RMD</span>
+                {/if}
+              </div>
               {#if $noteMode === mode.id}
                 <Icon icon="mdi:check-circle" class="w-5 h-5 text-[#1db954]" />
               {:else}
@@ -714,30 +686,6 @@
           />
           <span class="font-medium text-sm">{isTesting36 ? "Testing..." : "Test 36"}</span>
         </button>
-      </div>
-
-      <!-- Modifier Delay (for 36-key mode) -->
-      <div class="mt-4 pt-4 border-t border-white/10">
-        <div class="flex items-center justify-between mb-2">
-          <div>
-            <p class="font-medium text-white text-sm">Modifier Delay</p>
-            <p class="text-xs text-white/60">Timing for Shift/Ctrl keys (sharps/flats in 36-key mode)</p>
-          </div>
-          <span class="text-sm font-mono text-[#1db954]">{$modifierDelay}ms</span>
-        </div>
-        <input
-          type="range"
-          min="0"
-          max="20"
-          step="1"
-          value={$modifierDelay}
-          oninput={(e) => setModifierDelay(parseInt(e.target.value))}
-          class="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#1db954]"
-        />
-        <div class="flex justify-between text-xs text-white/40 mt-1">
-          <span>0ms (fast)</span>
-          <span>20ms (slow)</span>
-        </div>
       </div>
 
       <!-- Spam Test (Dev Only) -->

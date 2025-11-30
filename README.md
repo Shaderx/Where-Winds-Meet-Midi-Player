@@ -1,7 +1,7 @@
 # WWM Overlay - MIDI Music Player
 A beautiful music player for Where Winds Meet that plays your MIDI files by automatically pressing the right keyboard keys in-game.
 
-> **Note:** 36-key mode is currently unstable and experimental. We're looking for a better approach. For best results, use the default 21-key mode.
+> **Note:** 36-key mode uses instant Shift/Ctrl key combos for sharps and flats. If notes are dropping, try increasing the modifier delay in Settings.
 <img width="1180" height="620" alt="image" src="https://github.com/user-attachments/assets/8977b742-7f7d-47d9-b78f-d36ed677e3c5" />
 
 
@@ -122,10 +122,10 @@ You can change modes in real-time during playback using the `[` and `]` keys or 
 
 | Mode | Description |
 |------|-------------|
-| **21 Keys** | Natural notes only (default, most stable) |
-| **36 Keys** | Includes sharps/flats (⚠️ experimental, unstable) |
+| **21 Keys** | Natural notes only (default) |
+| **36 Keys** | Includes sharps/flats using Shift/Ctrl modifiers |
 
-Toggle between key modes using the "21/36" button in the bottom bar. **36-key mode is currently unstable** - we're exploring better approaches for sharp/flat support.
+Toggle between key modes using the "21/36" button in the bottom bar. 36-key mode sends modifier combos instantly (Shift+X, Ctrl+X) for sharps and flats.
 
 ### Cloud Gaming Mode
 
