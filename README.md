@@ -212,9 +212,12 @@ Play music together with friends! Each player handles different notes or tracks.
 - If members play **ahead** of you → decrease the delay
 - If members play **behind** you → increase the delay
 
+**Relay Server (TURN):**
+If you can't connect directly to other players (common with strict NATs/firewalls), enable "Use Relay Server" before creating or joining a room.
+
 **Known limitations:**
 - Only tested on local networks
-- P2P connection may fail on some network configurations
+- P2P connection may fail on some network configurations (try enabling Relay Server)
 - Sync accuracy depends on network conditions
 - File transfer only works for members who don't already have the file
 

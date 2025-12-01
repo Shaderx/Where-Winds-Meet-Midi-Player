@@ -34,6 +34,7 @@
     isCalibrating,
     startCalibration,
     stopCalibration,
+    useTurnServer,
   } from "../stores/band.js";
   import { midiFiles, isPlaying, isPaused } from "../stores/player.js";
   import { createEventDispatcher, onMount } from "svelte";
@@ -270,6 +271,25 @@
               {/if}
             </button>
           </div>
+        </div>
+
+        <!-- TURN Server Toggle -->
+        <div class="flex items-center justify-between py-2 px-3 bg-white/5 rounded-lg">
+          <div class="flex items-center gap-2">
+            <Icon icon="mdi:server-network" class="w-4 h-4 text-white/40" />
+            <div>
+              <p class="text-xs text-white/80">Use Relay Server</p>
+              <p class="text-[10px] text-white/40">Enable if direct connection fails</p>
+            </div>
+          </div>
+          <button
+            class="relative w-9 h-5 rounded-full transition-colors duration-200 {$useTurnServer ? 'bg-[#1db954]' : 'bg-white/20'}"
+            onclick={() => useTurnServer.update(v => !v)}
+          >
+            <div
+              class="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 {$useTurnServer ? 'translate-x-4' : 'translate-x-0.5'}"
+            ></div>
+          </button>
         </div>
 
         {#if error}

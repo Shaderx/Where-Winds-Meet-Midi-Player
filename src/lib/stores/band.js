@@ -54,6 +54,7 @@ export const myReady = writable(false); // Member's ready state
 export const bandFilePath = writable(null); // Path to use for playback (local or temp)
 export const autoReady = writable(true); // Auto-ready when song is received
 export const isCalibrating = writable(false); // Calibration mode active
+
 // Load saved hostDelay from localStorage
 const savedHostDelay = typeof localStorage !== 'undefined'
   ? parseInt(localStorage.getItem('hostDelay')) || 300
@@ -66,6 +67,53 @@ hostDelay.subscribe(value => {
     localStorage.setItem('hostDelay', value.toString());
   }
 });
+
+// TURN server settings (for users who can't connect directly)
+const savedUseTurn = typeof localStorage !== 'undefined'
+  ? localStorage.getItem('useTurnServer') === 'true'
+  : false;
+export const useTurnServer = writable(savedUseTurn);
+
+useTurnServer.subscribe(value => {
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('useTurnServer', value.toString());
+  }
+});
+
+// Get ICE configuration based on TURN setting
+function getIceConfig() {
+  const config = {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+    ]
+  };
+
+  if (get(useTurnServer)) {
+    // Use OpenRelay free public TURN servers
+    config.iceServers.push(
+      {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      }
+    );
+    console.log('[BAND] Using TURN relay servers');
+  }
+
+  return config;
+}
 
 // Internal state
 let peer = null;
@@ -90,8 +138,11 @@ export async function createRoom(playerName = 'Host') {
     const code = generateRoomCode();
 
     // PeerJS uses the room code as the peer ID for easy joining
+    const iceConfig = getIceConfig();
+    console.log('[BAND] Creating room with ICE config:', iceConfig);
     peer = new Peer(`wwm-${code}`, {
       debug: 1,
+      config: iceConfig,
     });
 
     peer.on('open', (id) => {
@@ -137,8 +188,11 @@ export async function joinRoom(code, playerName = 'Player') {
     let connectionTimeout = null;
     let connected = false;
 
+    const iceConfig = getIceConfig();
+    console.log('[BAND] Joining room with ICE config:', iceConfig);
     peer = new Peer({
       debug: 1,
+      config: iceConfig,
     });
 
     const cleanup = () => {
