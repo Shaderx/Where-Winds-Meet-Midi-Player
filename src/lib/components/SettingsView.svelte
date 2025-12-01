@@ -66,7 +66,7 @@
     azerty: {
       name: "AZERTY",
       desc: "French layout",
-      low: ["w", "x", "c", "v", "b", "n", "m"],
+      low: ["w", "x", "c", "v", "b", "n", ","],
       mid: ["q", "s", "d", "f", "g", "h", "j"],
       high: ["a", "z", "e", "r", "t", "y", "u"]
     }
@@ -386,15 +386,27 @@
   function applyNoteKeyBinding(keyName) {
     if (!recordingNoteKey) return;
 
-    // Only allow single letter keys (a-z)
+    // Allow: a-z, 0-9, and common punctuation (; , . /)
     const key = keyName.toLowerCase();
-    if (!/^[a-z]$/.test(key)) {
+    const allowedKeys = /^[a-z0-9;,./]$/;
+
+    // Also handle named keys
+    const keyMap = {
+      'semicolon': ';',
+      'comma': ',',
+      'period': '.',
+      'slash': '/',
+    };
+
+    const mappedKey = keyMap[key] || key;
+
+    if (!allowedKeys.test(mappedKey)) {
       stopRecordingNoteKey();
       return;
     }
 
     const { octave, index } = recordingNoteKey;
-    noteKeys[octave][index] = key;
+    noteKeys[octave][index] = mappedKey;
     noteKeys = { ...noteKeys }; // trigger reactivity
 
     stopRecordingNoteKey();
@@ -992,7 +1004,7 @@
       </div>
 
       <p class="text-xs text-white/40 mt-3">
-        Press Escape to cancel. Only A-Z keys are allowed for notes.
+        Press Escape to cancel. Allowed: A-Z, 0-9, ; , . /
       </p>
 
       <!-- 36-Key Info -->
