@@ -16,6 +16,8 @@
     toggleFavorite,
     savedPlaylists,
     addToSavedPlaylist,
+    addManyToSavedPlaylist,
+    createPlaylist,
     importMidiFile,
     isLoadingMidi,
     midiLoadProgress,
@@ -25,26 +27,32 @@
     loadAllFiles,
     playAllLibrary,
     libraryPlayMode,
+    loadMidiFiles,
+    isImportingFiles,
   } from "../stores/player.js";
   import { bandSongSelectMode, selectBandSong, cancelBandSongSelect } from "../stores/band.js";
   import SongContextMenu from "./SongContextMenu.svelte";
+  import SearchSort from "./SearchSort.svelte";
 
   let searchQuery = "";
   let showPlaylistMenu = null;
   let toast = null;
   let toastTimeout = null;
   let isDragOver = false;
-  let isImporting = false;
   let unlistenDrop = null;
   let unlistenHover = null;
   let unlistenCancel = null;
-  let sortBy = "name-asc"; // name-asc, name-desc, duration-asc, duration-desc
-  let showSortMenu = false;
+  let sortBy = "name-asc";
 
   // Import modal
   let showImportModal = false;
   let urlInput = "";
   let isDownloading = false;
+
+  // Post-import playlist prompt
+  let showPlaylistPrompt = false;
+  let lastImportedFiles = [];
+  let newPlaylistName = "";
 
   // Export library
   let isExporting = false;
@@ -53,13 +61,20 @@
   // Context menu
   let contextMenu = null;
 
+  // Multi-select state
+  let selectedFiles = new Set(); // Set of file hashes
+  let lastClickedIndex = -1; // For shift-click range selection
+  let showBulkPlaylistMenu = false;
+  let showCreatePlaylistModal = false;
+  let createPlaylistName = "";
+
   // Scroll mask
   let scrollContainer;
   let showTopMask = false;
   let showBottomMask = false;
 
   // Virtual scrolling - only render visible items
-  const ITEM_HEIGHT = 52; // Height of each item in pixels
+  const ITEM_HEIGHT = 54; // Height of each item in pixels (52px + 2px margin)
   const BUFFER_ITEMS = 10; // Extra items to render above/below viewport
   let visibleStartIndex = 0;
   let visibleEndIndex = 100; // Initial render count
@@ -142,29 +157,52 @@
     if (unlistenCancel) unlistenCancel();
   });
 
-  async function importFiles(midFiles) {
-    isImporting = true;
+  async function importFiles(midFiles, sourceName = "") {
+    isImportingFiles.set(true);
     let imported = 0;
+    let skipped = 0;
     let failed = 0;
+    let importedFilesList = [];
 
     for (const filePath of midFiles) {
       const result = await importMidiFile(filePath);
       if (result.success) {
         imported++;
+        importedFilesList.push(result.file);
+      } else if (result.error && result.error.includes("already exists")) {
+        // File already exists - find it in library and add to list
+        skipped++;
+        const fileName = filePath.split(/[/\\]/).pop();
+        const existingFile = $midiFiles.find(f => f.name === fileName.replace(/\.mid$/i, ''));
+        if (existingFile) {
+          importedFilesList.push(existingFile);
+        }
       } else {
         failed++;
         console.error(`Failed to import:`, result.error);
       }
     }
 
-    isImporting = false;
+    isImportingFiles.set(false);
+    await loadMidiFiles();
 
-    if (imported > 0 && failed === 0) {
+    if (imported > 0 && skipped === 0 && failed === 0) {
       showToast(`Imported ${imported} file${imported > 1 ? 's' : ''}`, "success");
-    } else if (imported > 0 && failed > 0) {
-      showToast(`Imported ${imported}, ${failed} failed`, "info");
+    } else if (imported > 0 || skipped > 0) {
+      const parts = [];
+      if (imported > 0) parts.push(`${imported} imported`);
+      if (skipped > 0) parts.push(`${skipped} already exist`);
+      if (failed > 0) parts.push(`${failed} failed`);
+      showToast(parts.join(', '), imported > 0 ? "success" : "info");
     } else {
       showToast("Failed to import files", "error");
+    }
+
+    // Show playlist prompt if multiple files were selected (imported + skipped)
+    if (importedFilesList.length > 1) {
+      lastImportedFiles = importedFilesList;
+      newPlaylistName = sourceName || `Imported ${new Date().toLocaleDateString()}`;
+      showPlaylistPrompt = true;
     }
   }
 
@@ -183,6 +221,105 @@
       console.error("Failed to open file dialog:", error);
       showToast("Failed to open file dialog", "error");
     }
+  }
+
+  async function openZipDialog() {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: "ZIP Archives", extensions: ["zip"] }],
+      });
+
+      if (selected) {
+        showImportModal = false;
+        await importFromZip(selected);
+      }
+    } catch (error) {
+      console.error("Failed to open zip dialog:", error);
+      showToast("Failed to open file dialog", "error");
+    }
+  }
+
+  async function openFolderDialog() {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+      });
+
+      if (selected) {
+        showImportModal = false;
+        await importFromFolder(selected);
+      }
+    } catch (error) {
+      console.error("Failed to open folder dialog:", error);
+      showToast("Failed to open folder dialog", "error");
+    }
+  }
+
+  async function importFromZip(zipPath) {
+    isImportingFiles.set(true);
+    try {
+      const imported = await invoke('import_from_zip', { zipPath });
+      await loadMidiFiles();
+      isImportingFiles.set(false);
+
+      if (imported.length > 0) {
+        showToast(`Imported ${imported.length} file${imported.length > 1 ? 's' : ''} from zip`, "success");
+        // Show playlist prompt
+        if (imported.length > 1) {
+          lastImportedFiles = imported;
+          const zipName = zipPath.split(/[\\/]/).pop()?.replace('.zip', '') || 'Imported';
+          newPlaylistName = zipName;
+          showPlaylistPrompt = true;
+        }
+      } else {
+        showToast("No MIDI files found in zip", "info");
+      }
+    } catch (error) {
+      isImportingFiles.set(false);
+      console.error("Failed to import from zip:", error);
+      showToast(error.toString(), "error");
+    }
+  }
+
+  async function importFromFolder(folderPath) {
+    isImportingFiles.set(true);
+    try {
+      // Get list of midi files in folder
+      const midiPaths = await invoke('list_midi_in_folder', { folderPath });
+
+      if (midiPaths.length === 0) {
+        isImportingFiles.set(false);
+        showToast("No MIDI files found in folder", "info");
+        return;
+      }
+
+      // Import using existing function
+      const folderName = folderPath.split(/[\\/]/).pop() || 'Imported';
+      await importFiles(midiPaths, folderName);
+    } catch (error) {
+      isImportingFiles.set(false);
+      console.error("Failed to import from folder:", error);
+      showToast(error.toString(), "error");
+    }
+  }
+
+  function createPlaylistFromImport() {
+    if (lastImportedFiles.length > 0 && newPlaylistName.trim()) {
+      const id = createPlaylist(newPlaylistName.trim());
+      addManyToSavedPlaylist(id, lastImportedFiles);
+      showToast(`Created playlist "${newPlaylistName.trim()}"`, "success");
+    }
+    showPlaylistPrompt = false;
+    lastImportedFiles = [];
+    newPlaylistName = "";
+  }
+
+  function skipPlaylistPrompt() {
+    showPlaylistPrompt = false;
+    lastImportedFiles = [];
+    newPlaylistName = "";
   }
 
   async function downloadFromUrl() {
@@ -205,8 +342,6 @@
       showImportModal = false;
       urlInput = "";
       showToast(`Imported "${result.name}"`, "success");
-      // Refresh file list
-      const { loadMidiFiles } = await import('../stores/player.js');
       await loadMidiFiles();
     } catch (error) {
       console.error("Failed to download:", error);
@@ -337,9 +472,113 @@
       }
     });
 
+  // Multi-select functions
+  function handleFileClick(e, file, index) {
+    const invalid = isInvalidFile(file);
+    if (invalid) return;
+
+    // Ctrl/Cmd + Click: Toggle individual selection
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      selectedFiles = new Set(selectedFiles);
+      if (selectedFiles.has(file.hash)) {
+        selectedFiles.delete(file.hash);
+      } else {
+        selectedFiles.add(file.hash);
+      }
+      lastClickedIndex = index;
+      return;
+    }
+
+    // Shift + Click: Range selection
+    if (e.shiftKey && lastClickedIndex !== -1) {
+      e.preventDefault();
+      const start = Math.min(lastClickedIndex, index);
+      const end = Math.max(lastClickedIndex, index);
+      selectedFiles = new Set(selectedFiles);
+      for (let i = start; i <= end; i++) {
+        const f = filteredFiles[i];
+        if (f && !isInvalidFile(f)) {
+          selectedFiles.add(f.hash);
+        }
+      }
+      return;
+    }
+
+    // Normal click: Clear selection and play
+    if (selectedFiles.size > 0) {
+      // If clicking on a selected file, keep selection
+      // Otherwise clear and handle normally
+      if (!selectedFiles.has(file.hash)) {
+        clearSelection();
+      }
+    }
+    lastClickedIndex = index;
+  }
+
+  function clearSelection() {
+    selectedFiles = new Set();
+    lastClickedIndex = -1;
+    showBulkPlaylistMenu = false;
+  }
+
+  function selectAll() {
+    selectedFiles = new Set(
+      filteredFiles
+        .filter(f => !isInvalidFile(f))
+        .map(f => f.hash)
+    );
+  }
+
+  function getSelectedFileObjects() {
+    return filteredFiles.filter(f => selectedFiles.has(f.hash));
+  }
+
+  function addSelectedToQueue() {
+    const files = getSelectedFileObjects();
+    playlist.update((list) => {
+      const existingPaths = new Set(list.map(f => f.path));
+      const newFiles = files.filter(f => !existingPaths.has(f.path));
+      return [...list, ...newFiles];
+    });
+    showToast(`Added ${files.length} songs to queue`, "success");
+    clearSelection();
+  }
+
+  function addSelectedToPlaylist(playlistId) {
+    const files = getSelectedFileObjects();
+    const pl = $savedPlaylists.find(p => p.id === playlistId);
+    addManyToSavedPlaylist(playlistId, files);
+    showBulkPlaylistMenu = false;
+    showToast(`Added ${files.length} songs to "${pl?.name}"`, "success");
+    clearSelection();
+  }
+
+  function openCreatePlaylistModal() {
+    createPlaylistName = `Playlist ${$savedPlaylists.length + 1}`;
+    showCreatePlaylistModal = true;
+    showBulkPlaylistMenu = false;
+  }
+
+  function createPlaylistFromSelected() {
+    if (!createPlaylistName.trim()) return;
+    const files = getSelectedFileObjects();
+    const id = createPlaylist(createPlaylistName.trim());
+    addManyToSavedPlaylist(id, files);
+    showToast(`Created "${createPlaylistName.trim()}" with ${files.length} songs`, "success");
+    showCreatePlaylistModal = false;
+    createPlaylistName = "";
+    clearSelection();
+  }
+
   // Context menu
   function handleContextMenu(e, file) {
     e.preventDefault();
+    // If right-clicking on a selected file, keep selection for bulk context menu
+    // Otherwise, clear selection
+    if (selectedFiles.size > 0 && !selectedFiles.has(file.hash)) {
+      clearSelection();
+    }
     contextMenu = { x: e.clientX, y: e.clientY, file };
   }
 
@@ -371,18 +610,6 @@
     </div>
   {/if}
 
-  <!-- Importing Overlay -->
-  {#if isImporting}
-    <div
-      class="absolute inset-0 z-40 bg-black/50 flex items-center justify-center"
-      transition:fade={{ duration: 150 }}
-    >
-      <div class="text-center">
-        <Icon icon="mdi:loading" class="w-12 h-12 text-[#1db954] mx-auto mb-4 animate-spin" />
-        <p class="text-lg font-semibold">Importing files...</p>
-      </div>
-    </div>
-  {/if}
 
   <!-- Band Selection Mode Banner -->
   {#if $bandSongSelectMode}
@@ -472,99 +699,159 @@
         <span class="text-white/30">•</span>
         <span class="text-xs text-white/30 flex items-center gap-1">
           <Icon icon="mdi:mouse" class="w-3 h-3" />
-          Right-click to rename, delete, or open location
+          Ctrl+click to select • Shift+click for range
         </span>
       {/if}
     </p>
 
     <!-- Search Input with Sort -->
-    <div class="flex gap-2">
-      <div class="relative flex-1">
-        <Icon
-          icon="mdi:magnify"
-          class="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 w-5 h-5"
-        />
-        <input
-          type="text"
-          placeholder="Search songs..."
-          bind:value={searchQuery}
-          class="w-full bg-white/5 border border-white/10 rounded-full pl-10 pr-10 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-[#1db954] focus:border-transparent focus:bg-white/10 transition-all"
-        />
-        {#if searchQuery}
-          <button
-            onclick={() => (searchQuery = "")}
-            class="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
-            transition:fade={{ duration: 150 }}
-          >
-            <Icon icon="mdi:close-circle" class="w-5 h-5" />
-          </button>
-        {/if}
-      </div>
+    <SearchSort
+      bind:searchQuery
+      bind:sortBy
+      placeholder="Search songs..."
+      {sortOptions}
+    />
+  </div>
 
-      <!-- Sort Button -->
-      <div class="relative">
+  <!-- Selection Toolbar -->
+  {#if selectedFiles.size > 0}
+    <div
+      class="mb-3 p-3 rounded-lg bg-[#1db954]/10 border border-[#1db954]/30 flex items-center gap-3"
+      transition:fly={{ y: -10, duration: 200 }}
+    >
+      <div class="flex items-center gap-2 flex-1">
+        <Icon icon="mdi:checkbox-multiple-marked" class="w-5 h-5 text-[#1db954]" />
+        <span class="text-sm font-medium">{selectedFiles.size} selected</span>
         <button
-          class="h-full px-3 bg-white/5 border border-white/10 rounded-full flex items-center gap-1.5 text-white/60 hover:text-white hover:bg-white/10 transition-all"
-          onclick={(e) => {
-            e.stopPropagation();
-            showSortMenu = !showSortMenu;
-          }}
-          title="Sort by"
+          class="text-xs text-white/50 hover:text-white transition-colors underline"
+          onclick={selectAll}
         >
-          <Icon icon={sortOptions.find(o => o.id === sortBy)?.icon || "mdi:sort"} class="w-4 h-4" />
-          <span class="text-xs font-medium">{sortOptions.find(o => o.id === sortBy)?.label}</span>
+          Select all ({filteredFiles.filter(f => !isInvalidFile(f)).length})
+        </button>
+      </div>
+      <div class="flex items-center gap-2">
+        <!-- Add to Queue -->
+        <button
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-sm font-medium transition-all"
+          onclick={addSelectedToQueue}
+          title="Add selected to queue"
+        >
+          <Icon icon="mdi:playlist-plus" class="w-4 h-4" />
+          Queue
         </button>
 
-        {#if showSortMenu}
-          <div
-            class="absolute right-0 top-full mt-1 w-36 bg-[#282828] rounded-lg shadow-xl border border-white/10 py-1 z-50"
-            transition:fly={{ y: -5, duration: 150 }}
-            onclick={(e) => e.stopPropagation()}
+        <!-- Add to Playlist Dropdown -->
+        <div class="relative">
+          <button
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#1db954] hover:bg-[#1ed760] text-white text-sm font-medium transition-all"
+            onclick={(e) => {
+              e.stopPropagation();
+              showBulkPlaylistMenu = !showBulkPlaylistMenu;
+            }}
+            title="Add selected to playlist"
           >
-            {#each sortOptions as option}
+            <Icon icon="mdi:playlist-music" class="w-4 h-4" />
+            Add to Playlist
+            <Icon icon="mdi:chevron-down" class="w-4 h-4" />
+          </button>
+
+          {#if showBulkPlaylistMenu}
+            <div
+              class="absolute right-0 top-full mt-1 w-48 bg-[#282828] rounded-lg shadow-xl border border-white/10 py-1 z-50"
+              transition:fly={{ y: -5, duration: 150 }}
+              onclick={(e) => e.stopPropagation()}
+            >
+              <!-- Create New Playlist -->
               <button
-                class="w-full px-3 py-2 text-left text-sm flex items-center gap-2 transition-colors {sortBy === option.id ? 'text-[#1db954] bg-white/5' : 'text-white/80 hover:bg-white/10'}"
-                onclick={(e) => {
-                  e.stopPropagation();
-                  sortBy = option.id;
-                  showSortMenu = false;
-                }}
+                class="w-full px-3 py-2 text-left text-sm text-[#1db954] hover:bg-white/10 flex items-center gap-2"
+                onclick={openCreatePlaylistModal}
               >
-                <Icon icon={option.icon} class="w-4 h-4" />
-                {option.label}
+                <Icon icon="mdi:playlist-plus" class="w-4 h-4 flex-shrink-0" />
+                <span>New Playlist...</span>
               </button>
-            {/each}
-          </div>
-        {/if}
+              {#if $savedPlaylists.length > 0}
+                <div class="border-t border-white/10 my-1"></div>
+                <div class="max-h-48 overflow-y-auto">
+                  {#each $savedPlaylists as pl}
+                    <button
+                      class="w-full px-3 py-2 text-left text-sm text-white/80 hover:bg-white/10 flex items-center gap-2 truncate"
+                      onclick={() => addSelectedToPlaylist(pl.id)}
+                    >
+                      <Icon icon="mdi:playlist-music-outline" class="w-4 h-4 flex-shrink-0" />
+                      <span class="truncate">{pl.name}</span>
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {/if}
+        </div>
+
+        <!-- Clear Selection -->
+        <button
+          class="p-1.5 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-all"
+          onclick={clearSelection}
+          title="Clear selection"
+        >
+          <Icon icon="mdi:close" class="w-5 h-5" />
+        </button>
       </div>
     </div>
-  </div>
+  {/if}
 
   <!-- Song List (Scrollable) - show if we have files, even while loading more -->
   {#if $midiFiles.length > 0}
   <div
     bind:this={scrollContainer}
     onscroll={handleScroll}
-    class="flex-1 overflow-y-auto pr-2 {showTopMask && showBottomMask ? 'scroll-mask-both' : showTopMask ? 'scroll-mask-top' : showBottomMask ? 'scroll-mask-bottom' : ''}"
+    class="flex-1 overflow-y-auto pr-2 -mx-1 px-1 {showTopMask && showBottomMask ? 'scroll-mask-both' : showTopMask ? 'scroll-mask-top' : showBottomMask ? 'scroll-mask-bottom' : ''}"
   >
     <!-- Virtual scroll padding top -->
     <div style="height: {topPadding}px"></div>
 
-    {#each visibleFiles as file, i (file.path)}
+    {#each visibleFiles as file, i (`${file.path}-${i}`)}
       {@const invalid = isInvalidFile(file)}
       {@const index = visibleStartIndex + i}
+      {@const isSelected = selectedFiles.has(file.hash)}
       <div
-        class="group spotify-list-item flex items-center gap-4 py-2 transition-colors duration-150 {$currentFile ===
-        file.path
-          ? 'bg-white/10 ring-1 ring-white/5'
-          : 'hover:bg-white/5'} {invalid ? 'opacity-60' : ''}"
-        style="height: {ITEM_HEIGHT}px"
-        title={invalid ? 'Invalid MIDI file - cannot parse' : ''}
+        class="group spotify-list-item flex items-center gap-4 py-2 rounded-lg transition-colors duration-150 {isSelected
+          ? 'bg-[#1db954]/20 ring-1 ring-[#1db954]/30'
+          : $currentFile === file.path
+            ? 'bg-white/10 ring-1 ring-white/5'
+            : 'hover:bg-white/5'} {invalid ? 'opacity-60' : ''}"
+        style="height: {ITEM_HEIGHT}px; margin-bottom: 2px;"
+        title={invalid ? 'Invalid MIDI file - cannot parse' : 'Ctrl+click to select, Shift+click for range'}
         oncontextmenu={(e) => handleContextMenu(e, file)}
+        onclick={(e) => handleFileClick(e, file, index)}
       >
-        <!-- Number / Play Button / Playing Indicator -->
+        <!-- Number / Checkbox / Play Button / Playing Indicator -->
         <div class="w-8 flex items-center justify-center flex-shrink-0">
-          {#if $currentFile === file.path && $isPlaying && !$isPaused}
+          {#if isSelected}
+            <!-- Checkbox for selected state -->
+            <button
+              class="flex items-center justify-center w-6 h-6 rounded bg-[#1db954] transition-transform hover:scale-110"
+              onclick={(e) => {
+                e.stopPropagation();
+                selectedFiles = new Set(selectedFiles);
+                selectedFiles.delete(file.hash);
+              }}
+              title="Deselect"
+            >
+              <Icon icon="mdi:check" class="w-4 h-4 text-black" />
+            </button>
+          {:else if selectedFiles.size > 0 && !invalid}
+            <!-- Empty checkbox when in selection mode -->
+            <button
+              class="flex items-center justify-center w-6 h-6 rounded border-2 border-white/30 hover:border-[#1db954] transition-colors group-hover:border-white/50"
+              onclick={(e) => {
+                e.stopPropagation();
+                selectedFiles = new Set(selectedFiles);
+                selectedFiles.add(file.hash);
+              }}
+              title="Select"
+            >
+            </button>
+          {:else if $currentFile === file.path && $isPlaying && !$isPaused}
             <!-- Playing indicator (animated bars) -->
             <div class="flex items-end gap-0.5 h-4">
               <div
@@ -589,7 +876,10 @@
             {#if !invalid}
               <button
                 class="hidden group-hover:flex items-center justify-center w-7 h-7 rounded-full bg-[#1db954] hover:scale-110 transition-transform shadow-lg"
-                onclick={() => handlePlay(file)}
+                onclick={(e) => {
+                  e.stopPropagation();
+                  handlePlay(file);
+                }}
                 title={$bandSongSelectMode ? "Select for Band" : "Play"}
               >
                 <Icon icon={$bandSongSelectMode ? "mdi:check" : "mdi:play"} class="w-4 h-4 text-black" />
@@ -603,11 +893,21 @@
           class="flex-1 min-w-0 {invalid ? 'cursor-not-allowed' : ''}"
           role={invalid ? undefined : "button"}
           tabindex={invalid ? undefined : 0}
-          onclick={() => !invalid && handlePlay(file)}
+          onclick={(e) => {
+            if (invalid) return;
+            // Don't play if Ctrl/Shift held (selection mode) or if selection exists
+            if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+            if (selectedFiles.size > 0 && !isSelected) return;
+            if (selectedFiles.size === 0) {
+              handlePlay(file);
+            }
+          }}
           onkeydown={(event) => {
             if (!invalid && (event.key === "Enter" || event.key === " ")) {
               event.preventDefault();
-              handlePlay(file);
+              if (selectedFiles.size === 0) {
+                handlePlay(file);
+              }
             }
           }}
         >
@@ -692,18 +992,20 @@
 
                 {#if $savedPlaylists.length > 0}
                   <div class="border-t border-white/10 my-1"></div>
-                  {#each $savedPlaylists as pl}
-                    <button
-                      class="w-full px-3 py-2 text-left text-sm text-white/80 hover:bg-white/10 flex items-center gap-2 truncate"
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        handleAddToPlaylist(pl.id, file);
-                      }}
-                    >
-                      <Icon icon="mdi:playlist-music-outline" class="w-4 h-4 flex-shrink-0" />
-                      <span class="truncate">{pl.name}</span>
-                    </button>
-                  {/each}
+                  <div class="max-h-48 overflow-y-auto">
+                    {#each $savedPlaylists as pl}
+                      <button
+                        class="w-full px-3 py-2 text-left text-sm text-white/80 hover:bg-white/10 flex items-center gap-2 truncate"
+                        onclick={(e) => {
+                          e.stopPropagation();
+                          handleAddToPlaylist(pl.id, file);
+                        }}
+                      >
+                        <Icon icon="mdi:playlist-music-outline" class="w-4 h-4 flex-shrink-0" />
+                        <span class="truncate">{pl.name}</span>
+                      </button>
+                    {/each}
+                  </div>
                 {/if}
               </div>
             {/if}
@@ -858,27 +1160,62 @@
       </div>
 
       <!-- Content -->
-      <div class="p-4 space-y-4">
+      <div class="p-4 space-y-3">
         <!-- Browse Files Option -->
         <button
-          class="w-full p-4 rounded-xl border-2 border-dashed border-white/20 hover:border-[#1db954] hover:bg-[#1db954]/5 transition-all group"
+          class="w-full p-3 rounded-xl border-2 border-dashed border-white/20 hover:border-[#1db954] hover:bg-[#1db954]/5 transition-all group"
           onclick={openFileDialog}
         >
           <div class="flex items-center gap-4">
-            <div class="w-12 h-12 rounded-xl bg-white/5 group-hover:bg-[#1db954]/20 flex items-center justify-center transition-colors">
-              <Icon icon="mdi:folder-open" class="w-6 h-6 text-white/60 group-hover:text-[#1db954] transition-colors" />
+            <div class="w-10 h-10 rounded-xl bg-white/5 group-hover:bg-[#1db954]/20 flex items-center justify-center transition-colors">
+              <Icon icon="mdi:file-music" class="w-5 h-5 text-white/60 group-hover:text-[#1db954] transition-colors" />
             </div>
             <div class="text-left">
-              <p class="font-semibold text-white group-hover:text-[#1db954] transition-colors">Browse Files</p>
-              <p class="text-sm text-white/50">Select .mid files from your computer</p>
+              <p class="font-semibold text-white group-hover:text-[#1db954] transition-colors">MIDI Files</p>
+              <p class="text-xs text-white/50">Select .mid files</p>
             </div>
           </div>
         </button>
 
+        <!-- Two column options -->
+        <div class="grid grid-cols-2 gap-3">
+          <!-- Import Zip Option -->
+          <button
+            class="p-3 rounded-xl border-2 border-dashed border-white/20 hover:border-[#1db954] hover:bg-[#1db954]/5 transition-all group"
+            onclick={openZipDialog}
+          >
+            <div class="flex flex-col items-center gap-2 text-center">
+              <div class="w-10 h-10 rounded-xl bg-white/5 group-hover:bg-[#1db954]/20 flex items-center justify-center transition-colors">
+                <Icon icon="mdi:folder-zip" class="w-5 h-5 text-white/60 group-hover:text-[#1db954] transition-colors" />
+              </div>
+              <div>
+                <p class="font-semibold text-sm text-white group-hover:text-[#1db954] transition-colors">ZIP File</p>
+                <p class="text-xs text-white/50">Extract .mid</p>
+              </div>
+            </div>
+          </button>
+
+          <!-- Browse Folder Option -->
+          <button
+            class="p-3 rounded-xl border-2 border-dashed border-white/20 hover:border-[#1db954] hover:bg-[#1db954]/5 transition-all group"
+            onclick={openFolderDialog}
+          >
+            <div class="flex flex-col items-center gap-2 text-center">
+              <div class="w-10 h-10 rounded-xl bg-white/5 group-hover:bg-[#1db954]/20 flex items-center justify-center transition-colors">
+                <Icon icon="mdi:folder-open" class="w-5 h-5 text-white/60 group-hover:text-[#1db954] transition-colors" />
+              </div>
+              <div>
+                <p class="font-semibold text-sm text-white group-hover:text-[#1db954] transition-colors">Folder</p>
+                <p class="text-xs text-white/50">Scan for .mid</p>
+              </div>
+            </div>
+          </button>
+        </div>
+
         <!-- Divider -->
         <div class="flex items-center gap-3">
           <div class="flex-1 h-px bg-white/10"></div>
-          <span class="text-xs text-white/40">or</span>
+          <span class="text-xs text-white/40">or paste URL</span>
           <div class="flex-1 h-px bg-white/10"></div>
         </div>
 
@@ -914,11 +1251,124 @@
   </div>
 {/if}
 
+<!-- Playlist Creation Prompt -->
+{#if showPlaylistPrompt}
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center"
+    transition:fade={{ duration: 150 }}
+  >
+    <button
+      class="absolute inset-0 bg-black/60"
+      onclick={skipPlaylistPrompt}
+    ></button>
+
+    <div
+      class="relative bg-[#282828] rounded-xl shadow-2xl w-[360px] max-w-[90vw] overflow-hidden"
+      transition:fly={{ y: 20, duration: 200 }}
+    >
+      <div class="p-4 text-center">
+        <div class="w-12 h-12 rounded-full bg-[#1db954]/20 flex items-center justify-center mx-auto mb-3">
+          <Icon icon="mdi:playlist-plus" class="w-6 h-6 text-[#1db954]" />
+        </div>
+        <h3 class="text-lg font-bold mb-2">Create Playlist?</h3>
+        <p class="text-sm text-white/60 mb-4">
+          {lastImportedFiles.length} songs imported. Create a playlist?
+        </p>
+        <input
+          type="text"
+          bind:value={newPlaylistName}
+          placeholder="Playlist name"
+          class="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-[#1db954] focus:border-transparent transition-all mb-4"
+          onkeydown={(e) => e.key === 'Enter' && createPlaylistFromImport()}
+        />
+      </div>
+
+      <div class="flex gap-2 p-4 pt-0">
+        <button
+          class="flex-1 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white font-medium text-sm transition-colors"
+          onclick={skipPlaylistPrompt}
+        >
+          Skip
+        </button>
+        <button
+          class="flex-1 py-2 rounded-lg bg-[#1db954] hover:bg-[#1ed760] text-white font-medium text-sm transition-colors disabled:opacity-50"
+          onclick={createPlaylistFromImport}
+          disabled={!newPlaylistName.trim()}
+        >
+          Create
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Create Playlist from Selection Modal -->
+{#if showCreatePlaylistModal}
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center"
+    transition:fade={{ duration: 150 }}
+  >
+    <button
+      class="absolute inset-0 bg-black/60"
+      onclick={() => { showCreatePlaylistModal = false; createPlaylistName = ""; }}
+    ></button>
+
+    <div
+      class="relative bg-[#282828] rounded-xl shadow-2xl w-[360px] max-w-[90vw] overflow-hidden"
+      transition:fly={{ y: 20, duration: 200 }}
+    >
+      <div class="p-4 text-center">
+        <div class="w-12 h-12 rounded-full bg-[#1db954]/20 flex items-center justify-center mx-auto mb-3">
+          <Icon icon="mdi:playlist-plus" class="w-6 h-6 text-[#1db954]" />
+        </div>
+        <h3 class="text-lg font-bold mb-2">Create Playlist</h3>
+        <p class="text-sm text-white/60 mb-4">
+          {selectedFiles.size} songs selected
+        </p>
+        <input
+          type="text"
+          bind:value={createPlaylistName}
+          placeholder="Playlist name"
+          class="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-[#1db954] focus:border-transparent transition-all mb-4"
+          onkeydown={(e) => e.key === 'Enter' && createPlaylistFromSelected()}
+        />
+      </div>
+
+      <div class="flex gap-2 p-4 pt-0">
+        <button
+          class="flex-1 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white font-medium text-sm transition-colors"
+          onclick={() => { showCreatePlaylistModal = false; createPlaylistName = ""; }}
+        >
+          Cancel
+        </button>
+        <button
+          class="flex-1 py-2 rounded-lg bg-[#1db954] hover:bg-[#1ed760] text-white font-medium text-sm transition-colors disabled:opacity-50"
+          onclick={createPlaylistFromSelected}
+          disabled={!createPlaylistName.trim()}
+        >
+          Create
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
 <svelte:window
   onclick={() => {
     showPlaylistMenu = null;
-    showSortMenu = false;
+    showBulkPlaylistMenu = false;
     contextMenu = null;
+  }}
+  onkeydown={(e) => {
+    // Escape to clear selection
+    if (e.key === 'Escape' && selectedFiles.size > 0) {
+      clearSelection();
+    }
+    // Ctrl+A to select all when focused in library
+    if ((e.ctrlKey || e.metaKey) && e.key === 'a' && scrollContainer?.contains(document.activeElement)) {
+      e.preventDefault();
+      selectAll();
+    }
   }}
 />
 

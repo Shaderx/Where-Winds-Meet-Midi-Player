@@ -44,8 +44,10 @@ If you enjoy this app, consider supporting me on Ko-fi!
 - **Octave shift control** - Adjust pitch up or down by up to 2 octaves
 - **Queue system** - Build your playlist and play songs in order
 - **Favorites** - Mark your favorite songs for quick access, drag to reorder
-- **Search & sort** - Find songs instantly and sort by name, duration, BPM, or difficulty
+- **Search & sort** - Find songs instantly in library, favorites, queue, and playlists
+- **Multi-select** - Ctrl+click or Shift+click to select multiple songs for bulk actions
 - **Multiple playlists** - Create, rename, and manage custom playlists
+- **Import folders & ZIPs** - Import entire folders or ZIP archives of MIDI files
 - **Drag & drop reordering** - Reorder songs in queue, favorites, and playlists
 - **Custom album location** - Choose where to load MIDI files from in Settings
 - **Real-time progress** - See exactly where you are in the song
@@ -224,6 +226,8 @@ If you can't connect directly to other players (common with strict NATs/firewall
 ### In-App Controls
 
 - **Click any song** to start playing
+- **Ctrl+click** - Select/deselect individual songs for bulk actions
+- **Shift+click** - Select a range of songs
 - **Right-click any song** - Rename, delete, or open file location
 - **Heart icon** - Add/remove from favorites
 - **Playlist icon** - Add to queue or saved playlists
@@ -249,6 +253,7 @@ If you can't connect directly to other players (common with strict NATs/firewall
 ### Tips
 
 - **Finding MIDI files**: Search online for "song name midi" or "song name .mid"
+- **Bulk import**: Use the Import button to add entire folders or ZIP archives of MIDI files
 - **Song not playing right?**: Try different note modes! Press `[` or `]` to cycle through modes while playing
 - **Too high or too low?**: Use the octave shift controls (+/-) in the bottom bar to adjust pitch
 - **Multiple songs**: Add multiple songs to your queue for a continuous playlist

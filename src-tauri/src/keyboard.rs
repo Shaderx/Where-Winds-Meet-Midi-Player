@@ -197,6 +197,7 @@ fn matches_target_window(hwnd: HWND, log: bool) -> bool {
     let title_string = String::from_utf16_lossy(&title[..len as usize]).to_lowercase();
 
     // Skip our own window and common apps that should never receive keys
+    // Also skip browsers (they may have game-related titles from YouTube/Twitch/etc)
     if title_string.contains("midi player")
         || title_string.contains("overlay")
         || title_string.contains("discord")
@@ -206,6 +207,16 @@ fn matches_target_window(hwnd: HWND, log: bool) -> bool {
         || title_string.contains("notepad")
         || title_string.contains("visual studio")
         || title_string.contains("vscode")
+        // Browsers - exclude to prevent matching YouTube/Twitch tabs with game titles
+        || title_string.contains("google chrome")
+        || title_string.contains("mozilla firefox")
+        || title_string.contains("microsoft edge")
+        || title_string.contains("opera")
+        || title_string.contains("brave")
+        || title_string.contains("vivaldi")
+        || title_string.contains("safari")
+        || title_string.contains("youtube")
+        || title_string.contains("twitch")
     {
         return false;
     }

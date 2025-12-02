@@ -138,7 +138,7 @@
       : true
     );
 
-  import { APP_VERSION } from "../version.js";
+  import { APP_VERSION, APP_FLAVOR } from "../version.js";
   let updateAvailable = null;
 
   const isDev = import.meta.env.DEV;
@@ -1144,7 +1144,7 @@
         <div class="flex items-center gap-2">
           <span class="text-xs text-white/40">By YueLyn</span>
           <span class="text-white/20">•</span>
-          <span class="text-xs text-white/40">v{APP_VERSION}</span>
+          <span class="text-xs text-white/40">v{APP_VERSION}{APP_FLAVOR ? `(${APP_FLAVOR})` : ''}</span>
         </div>
 
         {#if updateAvailable}

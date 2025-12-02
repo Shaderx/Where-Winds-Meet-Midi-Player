@@ -34,6 +34,7 @@ export const selectedTrackId = writable(null); // null = all, number = specific 
 // Playlist state
 export const midiFiles = writable([]);
 export const isLoadingMidi = writable(false);
+export const isImportingFiles = writable(false);
 export const midiLoadProgress = writable({ loaded: 0, total: 0 });
 export const totalMidiCount = writable(0); // Total files in album folder
 export const hasMoreFiles = writable(false); // Whether there are more files to load

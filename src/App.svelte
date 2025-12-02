@@ -8,8 +8,8 @@
   import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
 
   // Current version
-  import { APP_VERSION } from "./lib/version.js";
-  import { recordingKeybind } from "./lib/stores/player.js";
+  import { APP_VERSION, APP_FLAVOR } from "./lib/version.js";
+  import { recordingKeybind, isImportingFiles } from "./lib/stores/player.js";
 
   // Game window detection
   let gameFound = false;
@@ -522,7 +522,7 @@
 
 {#if $miniMode}
   <!-- Mini Mode - Container with drag handle -->
-  <div class="flex flex-col items-center">
+  <div class="flex flex-col items-center select-none">
     <!-- Drag handle above the icon (same style as main app) -->
     <div
       class="drag-handle flex bg-[#18181893] items-center justify-center cursor-move hover:opacity-80 transition-colors group mb-0.5 px-3 rounded"
@@ -558,7 +558,7 @@
 {:else}
   <main class="">
     <div
-      class="h-screen w-full flex flex-col overflow-hidden rounded-md {$isDraggable
+      class="h-screen w-full flex flex-col overflow-hidden rounded-md select-none {$isDraggable
         ? ''
         : 'pointer-events-none'}"
     >
@@ -676,7 +676,7 @@
               <span class="font-medium text-sm">Refresh</span>
             </button> -->
 
-            <p class="text-xs text-white/40 px-3">By YueLyn · v{APP_VERSION}</p>
+            <p class="text-xs text-white/40 px-3">By YueLyn · v{APP_VERSION}{APP_FLAVOR ? `(${APP_FLAVOR})` : ''}</p>
 
             <!-- Ko-fi Support -->
             <button
@@ -1061,7 +1061,7 @@
           </div>
           <div>
             <p class="text-2xl font-bold text-[#1db954]">v{updateAvailable.version}</p>
-            <p class="text-sm text-white/50">Current: v{APP_VERSION}</p>
+            <p class="text-sm text-white/50">Current: v{APP_VERSION}{APP_FLAVOR ? `(${APP_FLAVOR})` : ''}</p>
           </div>
         </div>
 
@@ -1218,6 +1218,19 @@
           </button>
         </div>
       </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Importing Files Overlay -->
+{#if $isImportingFiles}
+  <div
+    class="fixed inset-0 z-[100] bg-black/70 flex items-center justify-center"
+    transition:fade={{ duration: 150 }}
+  >
+    <div class="text-center">
+      <Icon icon="mdi:loading" class="w-12 h-12 text-[#1db954] mx-auto mb-4 animate-spin" />
+      <p class="text-lg font-semibold">Importing files...</p>
     </div>
   </div>
 {/if}

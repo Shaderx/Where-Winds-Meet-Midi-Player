@@ -11,6 +11,19 @@
     isPaused,
   } from "../stores/player.js";
   import SongContextMenu from "./SongContextMenu.svelte";
+  import SearchSort from "./SearchSort.svelte";
+
+  // Search & Sort
+  let searchQuery = "";
+  let sortBy = "manual";
+
+  const sortOptions = [
+    { id: "manual", label: "Manual", icon: "mdi:drag" },
+    { id: "name-asc", label: "A-Z", icon: "mdi:sort-alphabetical-ascending" },
+    { id: "name-desc", label: "Z-A", icon: "mdi:sort-alphabetical-descending" },
+    { id: "duration-asc", label: "Shortest", icon: "mdi:sort-numeric-ascending" },
+    { id: "duration-desc", label: "Longest", icon: "mdi:sort-numeric-descending" },
+  ];
 
   // Context menu
   let contextMenu = null;
@@ -22,14 +35,35 @@
 
   const flipDurationMs = 300;
 
-  // Use stable IDs based on path only
+  // Filter and sort queue
+  $: filteredPlaylist = (() => {
+    let result = searchQuery.trim()
+      ? $playlist.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      : [...$playlist];
+
+    if (sortBy !== "manual") {
+      result.sort((a, b) => {
+        switch (sortBy) {
+          case "name-asc": return a.name.localeCompare(b.name);
+          case "name-desc": return b.name.localeCompare(a.name);
+          case "duration-asc": return (a.duration || 0) - (b.duration || 0);
+          case "duration-desc": return (b.duration || 0) - (a.duration || 0);
+          default: return 0;
+        }
+      });
+    }
+    return result;
+  })();
+
+  // Use stable IDs based on hash + index (allows duplicates in queue)
   let items = [];
   $: {
     // Only update items if playlist changed (not during drag)
     if (!isDragging) {
-      items = $playlist.map((file) => ({
+      items = filteredPlaylist.map((file, index) => ({
         ...file,
-        id: file.hash,
+        id: `${file.hash}-${index}`,
+        originalIndex: $playlist.indexOf(file),
       }));
     }
   }
@@ -101,8 +135,20 @@
     {/if}
   </div>
 
-  <!-- Playlist Items with DnD -->
+  <!-- Search + Sort -->
   {#if $playlist.length > 0}
+    <div class="mb-4">
+      <SearchSort
+        bind:searchQuery
+        bind:sortBy
+        placeholder="Search queue..."
+        {sortOptions}
+      />
+    </div>
+  {/if}
+
+  <!-- Playlist Items with DnD -->
+  {#if filteredPlaylist.length > 0}
     <div
       class="flex-1 overflow-y-auto space-y-1 dnd-zone"
       role="list"
@@ -111,26 +157,29 @@
         items,
         flipDurationMs,
         dropTargetStyle: { outline: "none" },
+        dragDisabled: sortBy !== "manual",
       }}
       onconsider={handleDndConsider}
       onfinalize={handleDndFinalize}
     >
       {#each items as item, index (item.id)}
         <div
-          class="group spotify-list-item flex items-center gap-4 py-2 cursor-grab active:cursor-grabbing transition-all duration-200 {$currentFile ===
+          class="group spotify-list-item flex items-center gap-4 py-2 transition-all duration-200 {sortBy === 'manual' ? 'cursor-grab active:cursor-grabbing' : ''} {$currentFile ===
           item.path
             ? 'bg-white/10 ring-1 ring-white/5'
             : 'hover:bg-white/5'}"
           role="listitem"
-          animate:flip={{ duration: flipDurationMs }}
+          animate:flip={{ duration: isDragging ? flipDurationMs : 0 }}
           oncontextmenu={(e) => handleContextMenu(e, item)}
         >
           <!-- Drag Handle -->
-          <div
-            class="w-6 flex items-center justify-center text-white/30 hover:text-white/60 flex-shrink-0 transition-colors"
-          >
-            <Icon icon="mdi:drag-vertical" class="w-5 h-5" />
-          </div>
+          {#if sortBy === "manual"}
+            <div
+              class="w-6 flex items-center justify-center text-white/30 hover:text-white/60 flex-shrink-0 transition-colors"
+            >
+              <Icon icon="mdi:drag-vertical" class="w-5 h-5" />
+            </div>
+          {/if}
 
           <!-- Number / Play Button / Playing Indicator -->
           <div class="w-8 flex items-center justify-center flex-shrink-0">
@@ -214,11 +263,18 @@
       {/each}
     </div>
 
-    <div
-      class="pt-4 mt-4 border-t border-white/10 flex items-center justify-center gap-2 text-white/30"
-    >
-      <Icon icon="mdi:gesture-swipe-vertical" class="w-4 h-4" />
-      <p class="text-xs">Drag to reorder</p>
+    {#if sortBy === "manual"}
+      <div
+        class="pt-4 mt-4 border-t border-white/10 flex items-center justify-center gap-2 text-white/30"
+      >
+        <Icon icon="mdi:gesture-swipe-vertical" class="w-4 h-4" />
+        <p class="text-xs">Drag to reorder</p>
+      </div>
+    {/if}
+  {:else if $playlist.length > 0 && searchQuery}
+    <div class="flex-1 flex flex-col items-center justify-center text-white/40 py-16">
+      <Icon icon="mdi:magnify" class="w-10 h-10 opacity-50 mb-4" />
+      <p class="text-sm">No results for "{searchQuery}"</p>
     </div>
   {:else}
     <div

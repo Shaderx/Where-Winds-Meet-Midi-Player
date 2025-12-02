@@ -1233,6 +1233,86 @@ async fn import_midi_file(source_path: String) -> Result<MidiFile, String> {
     })
 }
 
+// Import all .mid files from a zip archive
+#[tauri::command]
+async fn import_from_zip(zip_path: String) -> Result<Vec<MidiFile>, String> {
+    use std::io::Read;
+
+    let zip_file = std::fs::File::open(&zip_path)
+        .map_err(|e| format!("Failed to open zip: {}", e))?;
+    let mut archive = zip::ZipArchive::new(zip_file)
+        .map_err(|e| format!("Invalid zip file: {}", e))?;
+
+    let album_path = get_album_folder()?;
+    std::fs::create_dir_all(&album_path).ok();
+
+    let mut imported = Vec::new();
+
+    for i in 0..archive.len() {
+        let mut file = match archive.by_index(i) {
+            Ok(f) => f,
+            Err(_) => continue,
+        };
+
+        let path = match file.enclosed_name() {
+            Some(p) => p.to_owned(),
+            None => continue,
+        };
+
+        // Only .mid files
+        if path.extension().and_then(|s| s.to_str()) != Some("mid") {
+            continue;
+        }
+
+        let filename = match path.file_name() {
+            Some(n) => n.to_owned(),
+            None => continue,
+        };
+
+        let dest = album_path.join(&filename);
+        if dest.exists() { continue; }
+
+        let mut contents = Vec::new();
+        if file.read_to_end(&mut contents).is_err() { continue; }
+        if std::fs::write(&dest, &contents).is_err() { continue; }
+
+        let name = std::path::Path::new(&filename)
+            .file_stem().and_then(|s| s.to_str()).unwrap_or("Unknown").to_string();
+        let meta = midi::get_midi_metadata(&dest.to_string_lossy())
+            .unwrap_or(midi::MidiMetadata { duration: 0.0, bpm: 120, note_count: 0, note_density: 0.0 });
+        let hash = compute_file_hash(&dest).unwrap_or_default();
+
+        imported.push(MidiFile {
+            name, path: dest.to_string_lossy().to_string(),
+            duration: meta.duration, bpm: meta.bpm, note_density: meta.note_density,
+            hash, size: contents.len() as u64,
+        });
+    }
+
+    Ok(imported)
+}
+
+// List all .mid files in a folder (recursive)
+#[tauri::command]
+async fn list_midi_in_folder(folder_path: String) -> Result<Vec<String>, String> {
+    fn find_midi(dir: &std::path::Path, files: &mut Vec<String>) {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    find_midi(&path, files);
+                } else if path.extension().and_then(|s| s.to_str()) == Some("mid") {
+                    files.push(path.to_string_lossy().to_string());
+                }
+            }
+        }
+    }
+
+    let mut files = Vec::new();
+    find_midi(std::path::Path::new(&folder_path), &mut files);
+    Ok(files)
+}
+
 #[tauri::command]
 async fn get_album_path() -> Result<String, String> {
     let path = get_album_folder()?;
@@ -2716,6 +2796,8 @@ fn main() {
             focus_game_window,
             seek,
             import_midi_file,
+            import_from_zip,
+            list_midi_in_folder,
             download_midi_from_url,
             get_visualizer_notes,
             open_url,

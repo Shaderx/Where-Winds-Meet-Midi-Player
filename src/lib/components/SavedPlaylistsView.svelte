@@ -28,6 +28,19 @@
     isPaused,
   } from "../stores/player.js";
   import SongContextMenu from "./SongContextMenu.svelte";
+  import SearchSort from "./SearchSort.svelte";
+
+  // Search & Sort for tracks
+  let searchQuery = "";
+  let sortBy = "manual";
+
+  const sortOptions = [
+    { id: "manual", label: "Manual", icon: "mdi:drag" },
+    { id: "name-asc", label: "A-Z", icon: "mdi:sort-alphabetical-ascending" },
+    { id: "name-desc", label: "Z-A", icon: "mdi:sort-alphabetical-descending" },
+    { id: "duration-asc", label: "Shortest", icon: "mdi:sort-numeric-ascending" },
+    { id: "duration-desc", label: "Longest", icon: "mdi:sort-numeric-descending" },
+  ];
 
   // Context menu
   let contextMenu = null;
@@ -81,14 +94,33 @@
     ? $savedPlaylists.find((p) => p.id === selectedPlaylistId)
     : null;
 
+  // Filter and sort tracks
+  $: filteredTracks = (() => {
+    if (!selectedPlaylist) return [];
+    let result = searchQuery.trim()
+      ? selectedPlaylist.tracks.filter(t => t.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      : [...selectedPlaylist.tracks];
+
+    if (sortBy !== "manual") {
+      result.sort((a, b) => {
+        switch (sortBy) {
+          case "name-asc": return a.name.localeCompare(b.name);
+          case "name-desc": return b.name.localeCompare(a.name);
+          case "duration-asc": return (a.duration || 0) - (b.duration || 0);
+          case "duration-desc": return (b.duration || 0) - (a.duration || 0);
+          default: return 0;
+        }
+      });
+    }
+    return result;
+  })();
+
   // Track items for drag and drop in playlist detail view
-  $: trackItems = selectedPlaylist
-    ? selectedPlaylist.tracks.map((track, index) => ({
-        ...track,
-        id: track.hash, // Use hash as unique ID (survives renames)
-        originalIndex: index,
-      }))
-    : [];
+  $: trackItems = filteredTracks.map((track, index) => ({
+    ...track,
+    id: `${track.hash}-${index}`, // Combine hash with index for unique ID (allows duplicates)
+    originalIndex: index,
+  }));
 
   // Items for drag and drop
   $: items = $savedPlaylists.map((pl, index) => ({
@@ -137,10 +169,12 @@
   }
 
   function handleDndConsider(e) {
+    isPlaylistDragging = true;
     items = e.detail.items;
   }
 
   function handleDndFinalize(e) {
+    isPlaylistDragging = false;
     const newItems = e.detail.items;
     // Update the store with new order and persist to file
     const newOrder = newItems.map(({ originalIndex, ...pl }) => pl);
@@ -160,11 +194,16 @@
   }
 
   // Track management functions
+  let isTrackDragging = false;
+  let isPlaylistDragging = false;
+
   function handleTrackDndConsider(e) {
+    isTrackDragging = true;
     trackItems = e.detail.items;
   }
 
   function handleTrackDndFinalize(e) {
+    isTrackDragging = false;
     if (!selectedPlaylistId) return;
 
     const newItems = e.detail.items;
@@ -261,71 +300,85 @@
 <div class="h-full flex flex-col">
   {#if selectedPlaylist}
     <!-- Playlist Detail View -->
-    <div class="mb-4" in:fly={{ x: 20, duration: 200 }}>
-      <button
-        class="flex items-center gap-2 text-white/60 hover:text-white mb-4 transition-colors"
-        onclick={goBack}
-      >
-        <Icon icon="mdi:arrow-left" class="w-5 h-5" />
-        <span class="text-sm">Back to Playlists</span>
-      </button>
-
-      <div class="flex items-center gap-4 mb-4">
-        <div
-          class="w-16 h-16 rounded-lg bg-white/10 flex items-center justify-center"
+    <div class="mb-3" in:fly={{ x: 20, duration: 200 }}>
+      <div class="flex items-center gap-3">
+        <button
+          class="p-1 -ml-1 text-white/60 hover:text-white transition-colors"
+          onclick={goBack}
+          title="Back to Playlists"
         >
-          <Icon icon="mdi:playlist-music" class="w-8 h-8 text-[#1db954]" />
+          <Icon icon="mdi:arrow-left" class="w-5 h-5" />
+        </button>
+
+        <div
+          class="w-10 h-10 rounded bg-white/10 flex items-center justify-center flex-shrink-0"
+        >
+          <Icon icon="mdi:playlist-music" class="w-5 h-5 text-[#1db954]" />
         </div>
+
         <div class="flex-1 min-w-0">
           {#if editingPlaylistId === selectedPlaylist.id}
             <input
               type="text"
               bind:value={editingName}
-              class="bg-white/10 border border-white/20 rounded px-2 py-1 text-lg font-bold w-full"
+              class="bg-white/10 border border-white/20 rounded px-2 py-0.5 text-base font-bold w-full"
               onblur={saveEdit}
               onkeydown={(e) => e.key === "Enter" && saveEdit()}
               autofocus
             />
           {:else}
             <h2
-              class="text-2xl font-bold truncate cursor-pointer hover:text-[#1db954] transition-colors"
+              class="text-lg font-bold truncate cursor-pointer hover:text-[#1db954] transition-colors"
               onclick={() => startEditing(selectedPlaylist)}
               title="Click to rename"
             >
               {selectedPlaylist.name}
             </h2>
           {/if}
-          <p class="text-sm text-white/60">
+          <p class="text-xs text-white/50">
             {selectedPlaylist.tracks.length} songs
           </p>
         </div>
-      </div>
 
-      <div class="flex gap-2">
-        <button
-          class="spotify-button spotify-button--primary flex items-center gap-2"
-          onclick={() => handleLoadToQueue(selectedPlaylist)}
-          disabled={selectedPlaylist.tracks.length === 0}
-        >
-          <Icon icon="mdi:play" class="w-5 h-5" />
-          Play
-        </button>
-        <button
-          class="spotify-button spotify-button--secondary flex items-center gap-2"
-          onclick={exportPlaylist}
-          disabled={selectedPlaylist.tracks.length === 0 || isExporting}
-          title="Export playlist with MIDI files"
-        >
-          <Icon icon={isExporting ? "mdi:loading" : "mdi:export"} class="w-4 h-4 {isExporting ? 'animate-spin' : ''}" />
-        </button>
-        <button
-          class="spotify-button spotify-button--secondary flex items-center gap-2"
-          onclick={() => handleDelete(selectedPlaylist.id)}
-        >
-          <Icon icon="mdi:delete-outline" class="w-4 h-4" />
-        </button>
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          <button
+            class="spotify-button spotify-button--primary flex items-center gap-1.5 text-sm py-1.5 px-3 !text-white"
+            onclick={() => handleLoadToQueue(selectedPlaylist)}
+            disabled={selectedPlaylist.tracks.length === 0}
+          >
+            <Icon icon="mdi:play" class="w-4 h-4" />
+            Play
+          </button>
+          <button
+            class="p-2 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-all"
+            onclick={exportPlaylist}
+            disabled={selectedPlaylist.tracks.length === 0 || isExporting}
+            title="Export playlist"
+          >
+            <Icon icon={isExporting ? "mdi:loading" : "mdi:export"} class="w-4 h-4 {isExporting ? 'animate-spin' : ''}" />
+          </button>
+          <button
+            class="p-2 rounded-full hover:bg-red-500/20 text-white/60 hover:text-red-400 transition-all"
+            onclick={() => handleDelete(selectedPlaylist.id)}
+            title="Delete playlist"
+          >
+            <Icon icon="mdi:delete-outline" class="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </div>
+
+    <!-- Search + Sort -->
+    {#if selectedPlaylist.tracks.length > 0}
+      <div class="mb-4">
+        <SearchSort
+          bind:searchQuery
+          bind:sortBy
+          placeholder="Search tracks..."
+          {sortOptions}
+        />
+      </div>
+    {/if}
 
     <!-- Playlist Tracks with Drag and Drop -->
     <div
@@ -336,6 +389,7 @@
         items: trackItems,
         flipDurationMs,
         dropTargetStyle: { outline: "none" },
+        dragDisabled: sortBy !== "manual",
       }}
       onconsider={handleTrackDndConsider}
       onfinalize={handleTrackDndFinalize}
@@ -345,14 +399,16 @@
         {@const isCurrentTrack = $currentFile === track.path}
         {@const isPlayingTrack = isCurrentTrack && $isPlaying && !$isPaused}
         <div
-          class="group spotify-list-item flex items-center gap-3 py-2 mb-1 cursor-grab active:cursor-grabbing transition-all duration-200 {isCurrentTrack ? 'bg-white/10 ring-1 ring-white/5' : 'hover:bg-white/5'} {isMissing ? 'opacity-50' : ''}"
-          animate:flip={{ duration: flipDurationMs }}
+          class="group spotify-list-item flex items-center gap-3 py-2 mb-1 transition-all duration-200 {sortBy === 'manual' ? 'cursor-grab active:cursor-grabbing' : ''} {isCurrentTrack ? 'bg-white/10 ring-1 ring-white/5' : 'hover:bg-white/5'} {isMissing ? 'opacity-50' : ''}"
+          animate:flip={{ duration: isTrackDragging ? flipDurationMs : 0 }}
           oncontextmenu={(e) => !isMissing && handleContextMenu(e, track)}
         >
           <!-- Drag Handle -->
-          <div class="text-white/30 hover:text-white/60 transition-colors flex-shrink-0">
-            <Icon icon="mdi:drag-vertical" class="w-5 h-5" />
-          </div>
+          {#if sortBy === "manual"}
+            <div class="text-white/30 hover:text-white/60 transition-colors flex-shrink-0">
+              <Icon icon="mdi:drag-vertical" class="w-5 h-5" />
+            </div>
+          {/if}
 
           <!-- Track Number / Play Button / Playing Indicator / Missing Icon -->
           <div class="w-8 flex items-center justify-center flex-shrink-0">
@@ -416,7 +472,12 @@
       {/each}
     </div>
 
-    {#if selectedPlaylist.tracks.length === 0}
+    {#if trackItems.length === 0 && selectedPlaylist.tracks.length > 0 && searchQuery}
+      <div class="flex-1 flex flex-col items-center justify-center text-white/40 py-12">
+        <Icon icon="mdi:magnify" class="w-10 h-10 opacity-50 mb-4" />
+        <p class="text-sm">No results for "{searchQuery}"</p>
+      </div>
+    {:else if selectedPlaylist.tracks.length === 0}
       <div class="flex-1 flex flex-col items-center justify-center text-white/40 py-12">
         <Icon
           icon="mdi:music-note-plus"
@@ -427,7 +488,7 @@
       </div>
     {/if}
 
-    {#if selectedPlaylist.tracks.length > 1}
+    {#if selectedPlaylist.tracks.length > 1 && sortBy === "manual"}
       <div
         class="pt-4 mt-4 border-t border-white/10 flex items-center justify-center gap-2 text-white/30"
       >
@@ -483,7 +544,7 @@
         {#each items as playlist (playlist.id)}
           <div
             class="group spotify-card mb-2 cursor-grab active:cursor-grabbing"
-            animate:flip={{ duration: flipDurationMs }}
+            animate:flip={{ duration: isPlaylistDragging ? flipDurationMs : 0 }}
           >
             <div class="flex items-center gap-4">
               <!-- Drag Handle -->
