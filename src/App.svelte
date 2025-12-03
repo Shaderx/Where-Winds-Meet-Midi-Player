@@ -419,6 +419,7 @@
     initializeListeners();
     initLibrary(); // Initialize library sharing (auto-connects if was enabled)
     checkForUpdates(); // Check for updates on startup
+    setInterval(checkForUpdates, 30 * 60 * 1000); // Check every 30 minutes
 
     // Save window position every 5 seconds (only if changed)
     savePositionInterval = setInterval(saveWindowPosition, 5000);
