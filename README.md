@@ -65,6 +65,7 @@ If you enjoy this app, consider supporting me on Ko-fi!
 - **Custom window detection** - Add custom process names for game window detection
 - **Settings search** - Quick search and navigation within settings
 - **Remember band name** - Your band mode name is saved across sessions
+- **Multi-language support** - English, 日本語, 한국어, ไทย, 中文
 
 ## How to Use
 
