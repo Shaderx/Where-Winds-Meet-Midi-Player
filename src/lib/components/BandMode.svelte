@@ -1,6 +1,7 @@
 <script>
   import Icon from "@iconify/svelte";
   import { fade, fly } from "svelte/transition";
+  import { t } from "svelte-i18n";
   import {
     bandEnabled,
     isHost,
@@ -101,7 +102,7 @@
 
   async function handleJoinRoom() {
     if (!joinCode.trim()) {
-      error = "Enter a room code";
+      error = $t("band.enterRoomCode");
       return;
     }
     isJoining = true;
@@ -202,12 +203,12 @@
           <Icon icon="mdi:account-group" class="w-6 h-6 text-[#1db954]" />
         </div>
         <div>
-          <h2 class="text-xl font-bold">Band Mode</h2>
+          <h2 class="text-xl font-bold">{$t("band.title")}</h2>
           <p class="text-xs text-white/60">
             {#if $bandStatus === 'connected'}
-              {$connectedPeers.length} player{$connectedPeers.length !== 1 ? 's' : ''}
+              {$connectedPeers.length} {$t("band.players")}
             {:else}
-              Play with friends
+              {$t("band.playWithFriends")}
             {/if}
           </p>
         </div>
@@ -219,11 +220,11 @@
       <div class="space-y-3" in:fade>
         <!-- Player Name -->
         <div>
-          <label class="block text-xs text-white/50 mb-1">Your Name</label>
+          <label class="block text-xs text-white/50 mb-1">{$t("band.yourName")}</label>
           <input
             type="text"
             bind:value={playerName}
-            placeholder="Enter your name"
+            placeholder={$t("band.enterName")}
             class="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-[#1db954] focus:border-transparent"
             onblur={savePlayerName}
             onchange={savePlayerName}
@@ -232,7 +233,7 @@
 
         <!-- Create Room -->
         <div>
-          <label class="block text-xs text-white/50 mb-1">Host a Session</label>
+          <label class="block text-xs text-white/50 mb-1">{$t("band.hostSession")}</label>
           <button
             class="w-full py-2 rounded-lg bg-[#1db954] hover:bg-[#1ed760] text-white font-medium text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             onclick={handleCreateRoom}
@@ -243,13 +244,13 @@
             {:else}
               <Icon icon="mdi:plus" class="w-4 h-4" />
             {/if}
-            Create Room
+            {$t("band.createRoom")}
           </button>
         </div>
 
         <!-- Join Room -->
         <div>
-          <label class="block text-xs text-white/50 mb-1">Join a Session</label>
+          <label class="block text-xs text-white/50 mb-1">{$t("band.joinSession")}</label>
           <div class="flex gap-2">
             <input
               type="text"
@@ -267,7 +268,7 @@
               {#if isJoining}
                 <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
               {:else}
-                Join
+                {$t("band.join")}
               {/if}
             </button>
           </div>
@@ -278,8 +279,8 @@
           <div class="flex items-center gap-2">
             <Icon icon="mdi:server-network" class="w-4 h-4 text-white/40" />
             <div>
-              <p class="text-xs text-white/80">Use Relay Server</p>
-              <p class="text-[10px] text-white/40">Enable if direct connection fails</p>
+              <p class="text-xs text-white/80">{$t("band.useRelay")}</p>
+              <p class="text-[10px] text-white/40">{$t("band.relayDesc")}</p>
             </div>
           </div>
           <button
@@ -303,13 +304,13 @@
         <!-- Room Code -->
         <div class="flex items-center gap-2 p-2 bg-white/5 rounded-lg">
           <div class="flex-1 min-w-0">
-            <p class="text-[10px] text-white/50">Room Code</p>
+            <p class="text-[10px] text-white/50">{$t("band.roomCode")}</p>
             <p class="text-base font-bold font-mono tracking-widest text-[#1db954]">{$roomCode}</p>
           </div>
           <button
             class="p-1.5 rounded bg-white/10 hover:bg-white/20 transition-colors text-white/60 hover:text-white"
             onclick={copyRoomCode}
-            title="Copy"
+            title={$t("band.copy")}
           >
             <Icon icon={copied ? "mdi:check" : "mdi:content-copy"} class="w-3.5 h-3.5" />
           </button>
@@ -317,7 +318,7 @@
 
         <!-- Play Mode Selector -->
         <div>
-          <p class="text-xs text-white/50 mb-1">Play Mode</p>
+          <p class="text-xs text-white/50 mb-1">{$t("band.playMode")}</p>
           <div class="flex gap-1">
             <button
               class="flex-1 px-3 py-1.5 rounded-lg text-xs transition-all flex items-center justify-center gap-1.5 {$bandPlayMode === 'split'
@@ -327,7 +328,7 @@
               disabled={!$isHost || $isPlaying}
             >
               <Icon icon="mdi:call-split" class="w-3.5 h-3.5" />
-              Split Notes
+              {$t("band.splitNotes")}
             </button>
             <button
               class="flex-1 px-3 py-1.5 rounded-lg text-xs transition-all flex items-center justify-center gap-1.5 {$bandPlayMode === 'track'
@@ -337,14 +338,14 @@
               disabled={!$isHost || $isPlaying}
             >
               <Icon icon="mdi:music-note-eighth" class="w-3.5 h-3.5" />
-              By Track
+              {$t("band.byTrack")}
             </button>
           </div>
           <p class="text-[10px] text-white/40 mt-1">
             {#if $bandPlayMode === 'split'}
-              Notes auto-distributed among players
+              {$t("band.splitDesc")}
             {:else}
-              Each player picks a MIDI track
+              {$t("band.trackDesc")}
             {/if}
           </p>
         </div>
@@ -353,17 +354,17 @@
         {#if $isHost}
           <div>
             <div class="flex items-center justify-between mb-2">
-              <p class="text-xs text-white/50">Sync Delay</p>
+              <p class="text-xs text-white/50">{$t("band.syncDelay")}</p>
               <button
                 class="px-2 py-0.5 rounded text-[10px] transition-all flex items-center gap-1 {$isCalibrating
                   ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
                   : 'bg-[#1db954]/20 text-[#1db954] hover:bg-[#1db954]/30'}"
                 onclick={() => $isCalibrating ? stopCalibration() : startCalibration()}
                 disabled={$connectedPeers.length < 2}
-                title={$connectedPeers.length < 2 ? "Need at least 1 member to calibrate" : $isCalibrating ? "Stop calibration test" : "Play test beeps to calibrate sync timing"}
+                title={$connectedPeers.length < 2 ? $t("band.needMemberToCalibrate") : $isCalibrating ? $t("band.stopCalibrationTest") : $t("band.playTestBeeps")}
               >
                 <Icon icon={$isCalibrating ? "mdi:stop" : "mdi:metronome"} class="w-3 h-3" />
-                {$isCalibrating ? "Stop Test" : "Sync Test"}
+                {$isCalibrating ? $t("band.stopTest") : $t("band.syncTest")}
               </button>
             </div>
             <!-- Input + Slider Row -->
@@ -438,11 +439,11 @@
             {#if $isCalibrating}
               <p class="text-[10px] text-yellow-400 mt-1.5 flex items-center gap-1">
                 <Icon icon="mdi:pulse" class="w-3 h-3 animate-pulse" />
-                Adjust until beeps sync across all devices
+                {$t("band.calibrateHint")}
               </p>
             {:else}
               <p class="text-[10px] text-white/40 mt-1.5">
-                + delay = host plays later · − delay = host plays earlier
+                {$t("band.delayHint")}
               </p>
             {/if}
           </div>
@@ -451,13 +452,13 @@
         <!-- Song Selection (Host only) -->
         {#if $isHost}
           <div>
-            <p class="text-xs text-white/50 mb-1">Song</p>
+            <p class="text-xs text-white/50 mb-1">{$t("band.song")}</p>
             {#if $bandSelectedSong}
               <button
                 class="w-full flex items-center gap-2 p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-left {$isPlaying ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}"
                 onclick={() => !$isPlaying && handleSelectSong()}
                 disabled={$isPlaying}
-                title={$isPlaying ? "Stop playback to change song" : "Click to change song"}
+                title={$isPlaying ? $t("band.stopToChangeSong") : $t("band.clickToChangeSong")}
               >
                 <div class="w-7 h-7 rounded bg-white/10 flex items-center justify-center shrink-0">
                   <Icon icon="mdi:music-note" class="w-3.5 h-3.5 text-[#1db954]" />
@@ -474,14 +475,14 @@
                 disabled={$isPlaying}
               >
                 <Icon icon="mdi:music-note-plus" class="w-3.5 h-3.5" />
-                Select Song
+                {$t("band.selectSong")}
               </button>
             {/if}
           </div>
         {:else}
           <!-- Song Display (Member view) -->
           <div>
-            <p class="text-xs text-white/50 mb-1">Song</p>
+            <p class="text-xs text-white/50 mb-1">{$t("band.song")}</p>
             {#if $bandSelectedSong}
               <div class="flex items-center gap-2 p-1.5 rounded-lg bg-white/5">
                 <div class="w-7 h-7 rounded bg-white/10 flex items-center justify-center shrink-0">
@@ -490,15 +491,15 @@
                 <div class="flex-1 min-w-0">
                   <p class="text-xs font-medium truncate">{$bandSelectedSong.name}</p>
                   {#if $bandSelectedSong.pending || !$bandFilePath}
-                    <p class="text-[10px] text-yellow-400">Downloading...</p>
+                    <p class="text-[10px] text-yellow-400">{$t("band.downloading")}</p>
                   {:else}
-                    <p class="text-[10px] text-white/40">Ready to play</p>
+                    <p class="text-[10px] text-white/40">{$t("band.readyToPlay")}</p>
                   {/if}
                 </div>
               </div>
             {:else}
               <div class="p-2 rounded-lg bg-white/5 border border-dashed border-white/20 text-white/40 text-center text-xs">
-                Waiting for host to select a song...
+                {$t("band.waitingForSong")}
               </div>
             {/if}
           </div>
@@ -509,9 +510,9 @@
           <div class="flex items-center justify-between mb-1">
             <p class="text-xs text-white/50">
               {#if $bandPlayMode === 'split'}
-                Players
+                {$t("band.players")}
               {:else}
-                Players & Tracks
+                {$t("band.playersAndTracks")}
               {/if}
             </p>
             {#if $isHost && $bandPlayMode === 'track' && $availableTracks.length > 0 && !$isPlaying}
@@ -519,17 +520,17 @@
                 <button
                   class="px-2 py-0.5 rounded text-[10px] bg-[#1db954]/20 text-[#1db954] hover:bg-[#1db954]/30 transition-colors flex items-center gap-1"
                   onclick={autoAssignTracks}
-                  title="Auto-assign tracks to players"
+                  title={$t("band.autoAssignTracks")}
                 >
                   <Icon icon="mdi:auto-fix" class="w-3 h-3" />
-                  Auto
+                  {$t("band.auto")}
                 </button>
                 <button
                   class="px-2 py-0.5 rounded text-[10px] bg-white/10 text-white/50 hover:bg-white/20 hover:text-white transition-colors"
                   onclick={clearAllAssignments}
-                  title="Clear all assignments"
+                  title={$t("band.clearAssignments")}
                 >
-                  Clear
+                  {$t("band.clear")}
                 </button>
               </div>
             {/if}
@@ -562,7 +563,7 @@
                   </p>
                   <!-- Ready status indicator -->
                   {#if !peer.isHost && $bandSelectedSong}
-                    <div class="flex items-center gap-1" title={peer.ready ? 'Ready' : 'Not ready'}>
+                    <div class="flex items-center gap-1" title={peer.ready ? $t("band.ready") : $t("band.notReady")}>
                       <Icon
                         icon={peer.ready ? "mdi:check-circle" : "mdi:clock-outline"}
                         class="w-3.5 h-3.5 {peer.ready ? 'text-[#1db954]' : 'text-white/30'}"
@@ -575,7 +576,7 @@
                     <button
                       class="p-1 rounded hover:bg-red-500/20 text-white/30 hover:text-red-400 transition-colors"
                       onclick={() => kickPlayer(peer.id)}
-                      title="Kick player"
+                      title={$t("band.kickPlayer")}
                     >
                       <Icon icon="mdi:close" class="w-3.5 h-3.5" />
                     </button>
@@ -585,7 +586,7 @@
                 {#if $bandPlayMode === 'split'}
                   <!-- Split mode: show which notes this player gets -->
                   <p class="text-[10px] text-white/40 mt-1 ml-7">
-                    Plays note {slotNumber + 1}, {slotNumber + 1 + $connectedPeers.length}, {slotNumber + 1 + $connectedPeers.length * 2}...
+                    {$t("band.playsNote", { values: { n1: slotNumber + 1, n2: slotNumber + 1 + $connectedPeers.length, n3: slotNumber + 1 + $connectedPeers.length * 2 } })}
                   </p>
                 {:else}
                   <!-- Track mode: track selection chips -->
@@ -598,7 +599,7 @@
                             : 'bg-white/5 text-white/50 hover:bg-white/10'}"
                           onclick={() => assignTrackToPlayer(peer.id, '')}
                         >
-                          All
+                          {$t("band.all")}
                         </button>
                         {#each $availableTracks as track}
                           <button
@@ -613,9 +614,9 @@
                       {:else if peerTrack}
                         <span class="px-2 py-1 rounded text-[10px] bg-[#1db954] text-white font-medium">{peerTrack.name}</span>
                       {:else if $isPlaying && $isHost}
-                        <span class="px-2 py-1 rounded text-[10px] bg-white/10 text-white/50">{peer.trackId !== null && peer.trackId !== undefined ? $availableTracks.find(t => t.id === peer.trackId)?.name || 'Track ' + peer.trackId : 'All'}</span>
+                        <span class="px-2 py-1 rounded text-[10px] bg-white/10 text-white/50">{peer.trackId !== null && peer.trackId !== undefined ? $availableTracks.find(t => t.id === peer.trackId)?.name || $t("band.trackNum", { values: { num: peer.trackId } }) : $t("band.all")}</span>
                       {:else}
-                        <span class="px-2 py-1 rounded text-[10px] bg-white/10 text-white/50">All</span>
+                        <span class="px-2 py-1 rounded text-[10px] bg-white/10 text-white/50">{$t("band.all")}</span>
                       {/if}
                     </div>
                   {/if}
@@ -639,7 +640,7 @@
                 onclick={bandPause}
               >
                 <Icon icon="mdi:pause" class="w-4 h-4" />
-                Pause
+                {$t("band.pause")}
               </button>
             {:else if showResume}
               <!-- Resume button when paused -->
@@ -648,7 +649,7 @@
                 onclick={() => bandPlay(0)}
               >
                 <Icon icon="mdi:play" class="w-4 h-4" />
-                Resume
+                {$t("band.resume")}
               </button>
             {:else}
               <!-- Play button when stopped -->
@@ -666,14 +667,14 @@
                   }
                 }}
                 disabled={!canPlay || isStartingPlayback}
-                title={!$bandSelectedSong ? "Select a song first" : $connectedPeers.length === 0 ? "Waiting for players" : "Start synchronized playback"}
+                title={!$bandSelectedSong ? $t("band.selectSongFirst") : $connectedPeers.length === 0 ? $t("band.waitingForPlayers") : $t("band.startSyncPlayback")}
               >
                 {#if isStartingPlayback}
                   <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
-                  Starting...
+                  {$t("band.starting")}
                 {:else}
                   <Icon icon="mdi:play" class="w-4 h-4" />
-                  Play
+                  {$t("band.play")}
                 {/if}
               </button>
             {/if}
@@ -682,7 +683,7 @@
                 ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400'
                 : 'bg-white/10 hover:bg-white/20 text-white/60 hover:text-white'} active:scale-95"
               onclick={bandStop}
-              title="Stop"
+              title={$t("band.stop")}
               disabled={!$isPlaying}
             >
               <Icon icon="mdi:stop" class="w-4 h-4" />
@@ -691,11 +692,11 @@
           {#if !canPlay && !$isPlaying}
             <p class="text-[10px] text-white/40 mt-1 text-center">
               {#if !$bandSelectedSong}
-                Select a song to play
+                {$t("band.selectSongFirst")}
               {:else if $connectedPeers.length === 0}
-                Waiting for players to join...
+                {$t("band.waitingForPlayers")}
               {:else if !membersReady}
-                Waiting for all members to be ready...
+                {$t("band.waitingForReady")}
               {/if}
             </p>
           {/if}
@@ -708,7 +709,7 @@
             {#if isPending}
               <div class="flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-yellow-500/10 text-yellow-400 text-xs">
                 <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
-                Receiving song file...
+                {$t("band.receivingSong")}
               </div>
             {:else}
               <button
@@ -719,11 +720,11 @@
                 disabled={$isPlaying}
               >
                 <Icon icon={$myReady ? "mdi:check" : "mdi:hand-wave"} class="w-4 h-4" />
-                {$myReady ? "Ready!" : "Ready Up"}
+                {$myReady ? $t("band.ready") : $t("band.readyUp")}
               </button>
               {#if !$myReady && !$isPlaying}
                 <p class="text-[10px] text-white/40 text-center">
-                  Click when you're ready to play
+                  {$t("band.clickWhenReady")}
                 </p>
               {/if}
             {/if}
@@ -735,7 +736,7 @@
           <div class="flex items-center justify-between p-2 rounded-lg bg-white/5">
             <div class="flex items-center gap-2">
               <Icon icon="mdi:lightning-bolt" class="w-3.5 h-3.5 text-white/50" />
-              <span class="text-xs text-white/70">Auto-ready</span>
+              <span class="text-xs text-white/70">{$t("band.autoReady")}</span>
             </div>
             <button
               class="w-8 h-4 rounded-full transition-colors {$autoReady ? 'bg-[#1db954]' : 'bg-white/20'}"
@@ -752,7 +753,7 @@
           onclick={handleLeave}
         >
           <Icon icon="mdi:exit-run" class="w-3.5 h-3.5" />
-          Leave
+          {$t("band.leave")}
         </button>
       </div>
     {/if}

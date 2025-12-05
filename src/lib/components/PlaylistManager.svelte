@@ -2,6 +2,7 @@
   import Icon from "@iconify/svelte";
   import { flip } from "svelte/animate";
   import { dndzone } from "svelte-dnd-action";
+  import { t } from "svelte-i18n";
   import {
     playlist,
     currentFile,
@@ -17,12 +18,12 @@
   let searchQuery = "";
   let sortBy = "manual";
 
-  const sortOptions = [
-    { id: "manual", label: "Manual", icon: "mdi:drag" },
-    { id: "name-asc", label: "A-Z", icon: "mdi:sort-alphabetical-ascending" },
-    { id: "name-desc", label: "Z-A", icon: "mdi:sort-alphabetical-descending" },
-    { id: "duration-asc", label: "Shortest", icon: "mdi:sort-numeric-ascending" },
-    { id: "duration-desc", label: "Longest", icon: "mdi:sort-numeric-descending" },
+  $: sortOptions = [
+    { id: "manual", label: $t("sort.manual"), icon: "mdi:drag" },
+    { id: "name-asc", label: $t("sort.nameAsc"), icon: "mdi:sort-alphabetical-ascending" },
+    { id: "name-desc", label: $t("sort.nameDesc"), icon: "mdi:sort-alphabetical-descending" },
+    { id: "duration-asc", label: $t("sort.durationAsc"), icon: "mdi:sort-numeric-ascending" },
+    { id: "duration-desc", label: $t("sort.durationDesc"), icon: "mdi:sort-numeric-descending" },
   ];
 
   // Context menu
@@ -114,12 +115,12 @@
   <!-- Header -->
   <div class="flex items-center justify-between mb-6">
     <div>
-      <h2 class="text-2xl font-bold mb-2">Queue</h2>
+      <h2 class="text-2xl font-bold mb-2">{$t("queue.title")}</h2>
       <p class="text-sm text-white/60">
-        {$playlist.length} songs
+        {$playlist.length} {$t("library.songs")}
         {#if $playlist.length > 0}
           <span class="text-[#1db954]">
-            • Playing {$currentIndex + 1} of {$playlist.length}
+            • {$t("queue.nowPlaying")} {$currentIndex + 1} / {$playlist.length}
           </span>
         {/if}
       </p>
@@ -130,7 +131,7 @@
         onclick={clearPlaylist}
       >
         <Icon icon="mdi:playlist-remove" class="w-4 h-4" />
-        Clear
+        {$t("favorites.clearAll")}
       </button>
     {/if}
   </div>
@@ -141,7 +142,7 @@
       <SearchSort
         bind:searchQuery
         bind:sortBy
-        placeholder="Search queue..."
+        placeholder={$t("queue.title") + "..."}
         {sortOptions}
       />
     </div>
@@ -237,7 +238,7 @@
               {item.name}
             </p>
             <p class="text-xs text-white/40">
-              {item.bpm || 120} BPM • {#if (item.note_density || 0) < 3}Easy{:else if (item.note_density || 0) < 6}Medium{:else if (item.note_density || 0) < 10}Hard{:else}Expert{/if}
+              {item.bpm || 120} BPM • {#if (item.note_density || 0) < 3}{$t("library.easy")}{:else if (item.note_density || 0) < 6}{$t("library.medium")}{:else if (item.note_density || 0) < 10}{$t("library.hard")}{:else}{$t("library.expert")}{/if}
             </p>
           </div>
 
@@ -255,7 +256,7 @@
               e.stopPropagation();
               removeFromPlaylist(index);
             }}
-            title="Remove from queue"
+            title={$t("playlists.remove")}
           >
             <Icon icon="mdi:close" class="w-4 h-4" />
           </button>
@@ -268,13 +269,13 @@
         class="pt-4 mt-4 border-t border-white/10 flex items-center justify-center gap-2 text-white/30"
       >
         <Icon icon="mdi:gesture-swipe-vertical" class="w-4 h-4" />
-        <p class="text-xs">Drag to reorder</p>
+        <p class="text-xs">{$t("playlists.dragToReorder")}</p>
       </div>
     {/if}
   {:else if $playlist.length > 0 && searchQuery}
     <div class="flex-1 flex flex-col items-center justify-center text-white/40 py-16">
       <Icon icon="mdi:magnify" class="w-10 h-10 opacity-50 mb-4" />
-      <p class="text-sm">No results for "{searchQuery}"</p>
+      <p class="text-sm">{$t("common.noResults", { values: { query: searchQuery } })}</p>
     </div>
   {:else}
     <div
@@ -285,8 +286,8 @@
       >
         <Icon icon="mdi:playlist-music" class="w-10 h-10 opacity-50" />
       </div>
-      <p class="text-lg font-semibold mb-2 text-white/60">Queue is empty</p>
-      <p class="text-sm text-white/40">Add tracks from your library</p>
+      <p class="text-lg font-semibold mb-2 text-white/60">{$t("queue.emptyQueue")}</p>
+      <p class="text-sm text-white/40">{$t("queue.addFromLibrary")}</p>
     </div>
   {/if}
 </div>

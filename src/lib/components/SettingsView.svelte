@@ -6,6 +6,7 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { onMount, onDestroy } from "svelte";
+  import { t } from "svelte-i18n";
   import {
     noteMode,
     setNoteMode,
@@ -100,26 +101,27 @@
   };
   let recordingKey = null; // Which key we're currently recording
 
-  const keybindingLabels = {
-    pause_resume: "Play / Pause",
-    stop: "Stop",
-    previous: "Previous Track",
-    next: "Next Track",
-    mode_prev: "Mode Prev",
-    mode_next: "Mode Next",
-    toggle_mini: "Mini Mode"
+  // Reactive keybinding labels for i18n
+  $: keybindingLabels = {
+    pause_resume: $t("settings.shortcuts.playPause"),
+    stop: $t("settings.shortcuts.stop"),
+    previous: $t("settings.shortcuts.previousTrack"),
+    next: $t("settings.shortcuts.nextTrack"),
+    mode_prev: $t("settings.shortcuts.modePrev"),
+    mode_next: $t("settings.shortcuts.modeNext"),
+    toggle_mini: $t("settings.shortcuts.miniMode")
   };
 
-  // Settings sections for search/navigation
-  const settingsSections = [
-    { id: "keybindings", label: "Shortcuts", icon: "mdi:keyboard-settings", keywords: ["keybindings", "shortcuts", "hotkeys", "keys", "bind"] },
-    { id: "window", label: "Window", icon: "mdi:application-outline", keywords: ["window", "detection", "process", "game"] },
-    { id: "notemode", label: "Note Mode", icon: "mdi:music-note", keywords: ["note", "mode", "calculation", "mapping"] },
-    { id: "keystyle", label: "Key Style", icon: "mdi:piano", keywords: ["key", "style", "play", "21", "36"] },
-    { id: "keyboard", label: "Note Keys", icon: "mdi:piano", keywords: ["keyboard", "qwertz", "azerty", "layout", "keys", "notes"] },
-    { id: "cloud", label: "Cloud", icon: "mdi:cloud", keywords: ["cloud", "gaming", "geforce", "input"] },
-    { id: "storage", label: "Storage", icon: "mdi:folder", keywords: ["storage", "album", "folder", "path"] },
-    { id: "debug", label: "Debug", icon: "mdi:bug", keywords: ["debug", "test", "keys", "spam"] },
+  // Settings sections for search/navigation (reactive for i18n)
+  $: settingsSections = [
+    { id: "keybindings", label: $t("settings.shortcuts.title"), icon: "mdi:keyboard-settings", keywords: ["keybindings", "shortcuts", "hotkeys", "keys", "bind"] },
+    { id: "window", label: $t("settings.window.title"), icon: "mdi:application-outline", keywords: ["window", "detection", "process", "game"] },
+    { id: "notemode", label: $t("noteMode.title"), icon: "mdi:music-note", keywords: ["note", "mode", "calculation", "mapping"] },
+    { id: "keystyle", label: $t("settings.keyStyle.title"), icon: "mdi:piano", keywords: ["key", "style", "play", "21", "36"] },
+    { id: "keyboard", label: $t("settings.keyboard.title"), icon: "mdi:piano", keywords: ["keyboard", "qwertz", "azerty", "layout", "keys", "notes"] },
+    { id: "cloud", label: $t("settings.playback.cloudMode"), icon: "mdi:cloud", keywords: ["cloud", "gaming", "geforce", "input"] },
+    { id: "storage", label: $t("settings.storage.title"), icon: "mdi:folder", keywords: ["storage", "album", "folder", "path"] },
+    { id: "debug", label: $t("settings.debug.title"), icon: "mdi:bug", keywords: ["debug", "test", "keys", "spam"] },
   ];
 
   function scrollToSection(id) {
@@ -505,17 +507,17 @@
     }
   }
 
-  // Note calculation mode options
-  const noteModesList = [
-    { id: "Python", name: "YueLyn", description: "YueLyn most fav play mode", rmd21: true },
-    { id: "Closest", name: "Closest", description: "Find closest available note (best for most songs)" },
-    { id: "Wide", name: "Wide", description: "Uses high and low rows more (spreads notes across octaves)" },
-    { id: "Sharps", name: "Sharps", description: "Uses Shift/Ctrl for sharps/flats", rmd36: true },
-    { id: "Quantize", name: "Quantize", description: "Snap to exact scale notes only" },
-    { id: "TransposeOnly", name: "Transpose Only", description: "Direct mapping with octave shifting" },
-    { id: "Pentatonic", name: "Pentatonic", description: "Map to 5-note pentatonic scale (do-re-mi-so-la)" },
-    { id: "Chromatic", name: "Chromatic", description: "Detailed 12-semitone to 7-key mapping" },
-    { id: "Raw", name: "Raw", description: "Direct 1:1 mapping, no auto-transpose (MIDI note % 21)" },
+  // Note calculation mode options (reactive for i18n)
+  $: noteModesList = [
+    { id: "Python", name: $t("noteMode.yuelyn"), description: $t("noteMode.yuelynDesc"), rmd21: true },
+    { id: "Closest", name: $t("noteMode.closest"), description: $t("noteMode.closestDesc") },
+    { id: "Wide", name: $t("noteMode.wide"), description: $t("noteMode.wideDesc") },
+    { id: "Sharps", name: $t("noteMode.sharps"), description: $t("noteMode.sharpsDesc"), rmd36: true },
+    { id: "Quantize", name: $t("noteMode.quantize"), description: $t("noteMode.quantizeDesc") },
+    { id: "TransposeOnly", name: $t("noteMode.transposeOnly"), description: $t("noteMode.transposeOnlyDesc") },
+    { id: "Pentatonic", name: $t("noteMode.pentatonic"), description: $t("noteMode.pentatonicDesc") },
+    { id: "Chromatic", name: $t("noteMode.chromatic"), description: $t("noteMode.chromaticDesc") },
+    { id: "Raw", name: $t("noteMode.raw"), description: $t("noteMode.rawDesc") },
   ];
 
   // Reactive: show RMD based on key mode
@@ -564,8 +566,8 @@
   <div class="mb-4">
     <div class="flex items-center justify-between mb-3">
       <div>
-        <h2 class="text-2xl font-bold">Settings</h2>
-        <p class="text-sm text-white/60">Configure your playback preferences</p>
+        <h2 class="text-2xl font-bold">{$t("settings.title")}</h2>
+        <p class="text-sm text-white/60">{$t("settings.subtitle")}</p>
       </div>
     </div>
 
@@ -574,7 +576,7 @@
       <Icon icon="mdi:magnify" class="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 w-4 h-4" />
       <input
         type="text"
-        placeholder="Search settings..."
+        placeholder={$t("settings.searchPlaceholder")}
         bind:value={searchQuery}
         class="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-[#1db954]"
       />
@@ -609,18 +611,18 @@
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-2">
           <Icon icon="mdi:keyboard-settings" class="w-5 h-5 text-[#1db954]" />
-          <h3 class="text-lg font-semibold">Shortcuts</h3>
+          <h3 class="text-lg font-semibold">{$t("settings.shortcuts.title")}</h3>
         </div>
         <button
           class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white/60 hover:text-white text-xs font-medium transition-colors"
           onclick={resetKeybindings}
         >
-          Reset to Default
+          {$t("settings.shortcuts.resetToDefault")}
         </button>
       </div>
 
       <p class="text-sm text-white/60 mb-4">
-        Click a key to change it. Press Escape to cancel. Changes apply instantly.
+        {$t("settings.shortcuts.description")}
       </p>
 
       <div class="grid grid-cols-2 gap-3">
@@ -638,7 +640,7 @@
       </div>
 
       <p class="text-xs text-white/40 mt-3">
-        Supported: F1-F12, A-Z, 0-9, Arrow keys, Insert, Delete, Home, End, PageUp/Down, Numpad, [ ] ` - = \ ; ' , . /
+        {$t("settings.shortcuts.supported")}
       </p>
     </div>
 
@@ -650,11 +652,11 @@
     >
       <div class="flex items-center gap-2 mb-4">
         <Icon icon="mdi:application-outline" class="w-5 h-5 text-[#1db954]" />
-        <h3 class="text-lg font-semibold">Window Detection</h3>
+        <h3 class="text-lg font-semibold">{$t("settings.window.title")}</h3>
       </div>
 
       <p class="text-sm text-white/60 mb-4">
-        Add custom window titles to detect as game window
+        {$t("settings.window.description")}
       </p>
 
       <!-- Add new keyword -->
@@ -662,7 +664,7 @@
         <input
           type="text"
           bind:value={newKeyword}
-          placeholder="Enter window name..."
+          placeholder={$t("settings.window.placeholder")}
           class="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-[#1db954] focus:border-transparent"
           onkeydown={(e) => e.key === 'Enter' && addWindowKeyword()}
         />
@@ -670,14 +672,14 @@
           class="px-4 py-2 rounded-lg bg-[#1db954] hover:bg-[#1ed760] text-white font-medium text-sm transition-colors"
           onclick={addWindowKeyword}
         >
-          Add
+          {$t("settings.window.add")}
         </button>
       </div>
 
       <!-- Custom keywords -->
       {#if customWindowKeywords.length > 0}
         <div class="mb-3">
-          <p class="text-xs text-white/40 mb-2">Custom:</p>
+          <p class="text-xs text-white/40 mb-2">{$t("settings.window.custom")}</p>
           <div class="flex flex-wrap gap-1.5">
             {#each customWindowKeywords as keyword}
               <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/10 text-xs text-white/60">
@@ -697,7 +699,7 @@
 
       <!-- Built-in keywords -->
       <div>
-        <p class="text-xs text-white/40 mb-2">Built-in:</p>
+        <p class="text-xs text-white/40 mb-2">{$t("settings.window.builtIn")}</p>
         <div class="flex flex-wrap gap-1.5">
           {#each ['Where Winds Meet', 'WWM', 'GeForce Now', '燕云十六声', '연운'] as builtin}
             <span class="px-2 py-0.5 rounded-full bg-white/10 text-xs text-white/60">{builtin}</span>
@@ -714,11 +716,11 @@
     >
       <div class="flex items-center gap-2 mb-4">
         <Icon icon="mdi:music-note" class="w-5 h-5 text-[#1db954]" />
-        <h3 class="text-lg font-semibold">Note Calculation Mode</h3>
+        <h3 class="text-lg font-semibold">{$t("settings.noteMode.title")}</h3>
       </div>
 
       <p class="text-sm text-white/60 mb-4">
-        Choose how MIDI notes are mapped to game keys
+        {$t("settings.noteMode.description")}
       </p>
 
       <div class="space-y-3">
@@ -760,11 +762,11 @@
     >
       <div class="flex items-center gap-2 mb-4">
         <Icon icon="mdi:piano" class="w-5 h-5 text-[#1db954]" />
-        <h3 class="text-lg font-semibold">Play Style (Key Mode)</h3>
+        <h3 class="text-lg font-semibold">{$t("settings.keyStyle.title")}</h3>
       </div>
 
       <p class="text-sm text-white/60 mb-4">
-        Choose between 21-key (natural notes) or 36-key (with sharps/flats)
+        {$t("settings.keyStyle.description")}
       </p>
 
       <div class="flex gap-3">
@@ -775,8 +777,8 @@
           onclick={() => setKeyMode('Keys21')}
         >
           <div class="text-center">
-            <span class="text-2xl font-bold">21</span>
-            <p class="text-xs text-white/60 mt-1">Natural notes</p>
+            <span class="text-2xl font-bold">{$t("keyMode.keys21")}</span>
+            <p class="text-xs text-white/60 mt-1">{$t("keyMode.keys21Desc")}</p>
           </div>
         </button>
         <button
@@ -786,8 +788,8 @@
           onclick={() => setKeyMode('Keys36')}
         >
           <div class="text-center">
-            <span class="text-2xl font-bold">36</span>
-            <p class="text-xs text-white/60 mt-1">With sharps/flats</p>
+            <span class="text-2xl font-bold">{$t("keyMode.keys36")}</span>
+            <p class="text-xs text-white/60 mt-1">{$t("keyMode.keys36Desc")}</p>
           </div>
         </button>
       </div>
@@ -805,7 +807,7 @@
             icon={isTesting ? "mdi:loading" : "mdi:piano"}
             class="w-5 h-5 {isTesting ? 'animate-spin' : ''}"
           />
-          <span class="font-medium text-sm">{isTesting ? "Testing..." : "Test 21"}</span>
+          <span class="font-medium text-sm">{isTesting ? $t("settings.keyStyle.testing") : $t("settings.keyStyle.test21")}</span>
         </button>
         <button
           class="flex-1 py-3 px-4 rounded-lg bg-white/10 hover:bg-white/15 transition-colors flex items-center justify-center gap-2 {isTesting36
@@ -818,7 +820,7 @@
             icon={isTesting36 ? "mdi:loading" : "mdi:piano"}
             class="w-5 h-5 {isTesting36 ? 'animate-spin' : ''}"
           />
-          <span class="font-medium text-sm">{isTesting36 ? "Testing..." : "Test 36"}</span>
+          <span class="font-medium text-sm">{isTesting36 ? $t("settings.keyStyle.testing") : $t("settings.keyStyle.test36")}</span>
         </button>
       </div>
 
@@ -914,24 +916,24 @@
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-2">
           <Icon icon="mdi:keyboard" class="w-5 h-5 text-[#1db954]" />
-          <h3 class="text-lg font-semibold">Note Keys</h3>
+          <h3 class="text-lg font-semibold">{$t("settings.keyboard.title")}</h3>
         </div>
         <button
           class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white/60 hover:text-white text-xs font-medium transition-colors"
           onclick={resetNoteKeys}
         >
-          Reset to Default
+          {$t("settings.shortcuts.resetToDefault")}
         </button>
       </div>
 
       <p class="text-sm text-white/60 mb-3">
-        Customize which keys play each note. Click a key to change it, or select a preset layout.
+        {$t("settings.keyboard.description")}
       </p>
 
       {#if !activePreset}
         <div class="flex items-center gap-2 px-3 py-2 mb-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
           <Icon icon="mdi:tune" class="w-4 h-4 text-purple-400" />
-          <span class="text-xs text-purple-300">Custom layout</span>
+          <span class="text-xs text-purple-300">{$t("settings.keyboard.customLayout")}</span>
         </div>
       {/if}
 
@@ -959,7 +961,7 @@
       <div class="space-y-3">
         <!-- High Octave -->
         <div class="bg-white/5 rounded-lg p-3">
-          <p class="text-xs text-white/40 mb-2">High Octave (C5-B5)</p>
+          <p class="text-xs text-white/40 mb-2">{$t("settings.keyboard.highOctave")}</p>
           <div class="flex gap-1.5">
             {#each noteKeys.high as key, i}
               <button
@@ -974,7 +976,7 @@
 
         <!-- Mid Octave -->
         <div class="bg-white/5 rounded-lg p-3">
-          <p class="text-xs text-white/40 mb-2">Mid Octave (C4-B4)</p>
+          <p class="text-xs text-white/40 mb-2">{$t("settings.keyboard.midOctave")}</p>
           <div class="flex gap-1.5">
             {#each noteKeys.mid as key, i}
               <button
@@ -989,7 +991,7 @@
 
         <!-- Low Octave -->
         <div class="bg-white/5 rounded-lg p-3">
-          <p class="text-xs text-white/40 mb-2">Low Octave (C3-B3)</p>
+          <p class="text-xs text-white/40 mb-2">{$t("settings.keyboard.lowOctave")}</p>
           <div class="flex gap-1.5">
             {#each noteKeys.low as key, i}
               <button
@@ -1004,20 +1006,20 @@
       </div>
 
       <p class="text-xs text-white/40 mt-3">
-        Press Escape to cancel. Allowed: A-Z, 0-9, ; , . /
+        {$t("settings.keyboard.escapeToCancel")}
       </p>
 
       <!-- 36-Key Info -->
       <div class="mt-4 pt-4 border-t border-white/10">
-        <p class="text-xs text-white/40 mb-2">36-Key Mode (sharps/flats use modifiers):</p>
+        <p class="text-xs text-white/40 mb-2">{$t("settings.keyboard.keyMode36Info")}</p>
         <div class="space-y-1 text-xs">
           <div>
             <span class="text-orange-400">Shift+</span>
-            <span class="text-white/60">for C# F# G#</span>
+            <span class="text-white/60">{$t("settings.keyboard.shiftFor")}</span>
           </div>
           <div>
             <span class="text-blue-400">Ctrl+</span>
-            <span class="text-white/60">for Eb Bb</span>
+            <span class="text-white/60">{$t("settings.keyboard.ctrlFor")}</span>
           </div>
         </div>
       </div>
@@ -1031,14 +1033,14 @@
     >
       <div class="flex items-center gap-2 mb-4">
         <Icon icon="mdi:play-circle-outline" class="w-5 h-5 text-[#1db954]" />
-        <h3 class="text-lg font-semibold">Playback Settings</h3>
+        <h3 class="text-lg font-semibold">{$t("settings.playback.title")}</h3>
       </div>
 
       <!-- Smart Pause Toggle -->
       <div class="flex items-center justify-between py-3">
         <div>
-          <p class="font-medium text-white">Smart Pause</p>
-          <p class="text-sm text-white/60">Auto-pause when game loses focus</p>
+          <p class="font-medium text-white">{$t("settings.playback.smartPause")}</p>
+          <p class="text-sm text-white/60">{$t("settings.playback.smartPauseDesc")}</p>
         </div>
         <button
           class="relative w-12 h-6 rounded-full transition-colors duration-200 {$smartPause
@@ -1057,13 +1059,13 @@
       <!-- Cloud Gaming Mode Toggle -->
       <div id="settings-cloud" class="flex items-center justify-between py-3 border-t border-white/10 scroll-mt-4">
         <div>
-          <p class="font-medium text-white">Cloud Gaming Mode</p>
-          <p class="text-sm text-white/60">For GeForce Now, Xbox Cloud, etc.</p>
+          <p class="font-medium text-white">{$t("settings.playback.cloudMode")}</p>
+          <p class="text-sm text-white/60">{$t("settings.playback.cloudModeDesc")}</p>
           {#if cloudMode}
             <div class="text-xs text-orange-400 mt-1 space-y-0.5">
-              <p>⚠️ Uses SendInput (global keyboard simulation)</p>
-              <p>⚠️ Background play without focus is NOT possible</p>
-              <p>⚠️ Don't type while playing - keys will interfere!</p>
+              <p>⚠️ {$t("settings.playback.cloudWarning1")}</p>
+              <p>⚠️ {$t("settings.playback.cloudWarning2")}</p>
+              <p>⚠️ {$t("settings.playback.cloudWarning3")}</p>
             </div>
           {/if}
         </div>
@@ -1090,18 +1092,18 @@
     >
       <div class="flex items-center gap-2 mb-4">
         <Icon icon="mdi:folder-music" class="w-5 h-5 text-[#1db954]" />
-        <h3 class="text-lg font-semibold">Album Location</h3>
+        <h3 class="text-lg font-semibold">{$t("settings.storage.title")}</h3>
       </div>
 
       <p class="text-sm text-white/60 mb-4">
-        Choose where to load MIDI files from
+        {$t("settings.storage.description")}
       </p>
 
       <!-- Current Path Display -->
       <div class="bg-white/5 rounded-lg p-3 mb-4">
-        <p class="text-xs text-white/40 mb-1">Current folder:</p>
+        <p class="text-xs text-white/40 mb-1">{$t("settings.storage.currentFolder")}</p>
         <p class="text-sm text-white font-mono truncate" title={albumPath}>
-          {albumPath || "Loading..."}
+          {albumPath || $t("settings.storage.loading")}
         </p>
       </div>
 
@@ -1116,15 +1118,15 @@
             icon={isChangingPath ? "mdi:loading" : "mdi:folder-open"}
             class="w-5 h-5 {isChangingPath ? 'animate-spin' : ''}"
           />
-          <span class="font-medium text-sm">{isChangingPath ? "Selecting..." : "Browse"}</span>
+          <span class="font-medium text-sm">{isChangingPath ? $t("settings.storage.selecting") : $t("settings.storage.browse")}</span>
         </button>
         <button
           class="py-3 px-4 rounded-lg bg-white/10 hover:bg-white/15 transition-colors flex items-center justify-center gap-2"
           onclick={resetAlbumPath}
-          title="Reset to default (./album)"
+          title={$t("settings.storage.resetToDefault")}
         >
           <Icon icon="mdi:restore" class="w-5 h-5" />
-          <span class="font-medium text-sm">Reset</span>
+          <span class="font-medium text-sm">{$t("settings.storage.reset")}</span>
         </button>
       </div>
     </div>
@@ -1136,13 +1138,13 @@
     >
       <div class="flex items-center gap-2 mb-4">
         <Icon icon="mdi:information-outline" class="w-5 h-5 text-[#1db954]" />
-        <h3 class="text-lg font-semibold">About</h3>
+        <h3 class="text-lg font-semibold">{$t("settings.about.title")}</h3>
       </div>
 
       <div class="text-sm text-white/60 space-y-3">
-        <p>Midi Player for Where Winds Meet</p>
+        <p>{$t("settings.about.description")}</p>
         <div class="flex items-center gap-2">
-          <span class="text-xs text-white/40">By YueLyn</span>
+          <span class="text-xs text-white/40">{$t("settings.about.byYueLyn")}</span>
           <span class="text-white/20">•</span>
           <span class="text-xs text-white/40">v{APP_VERSION}{APP_FLAVOR ? `(${APP_FLAVOR})` : ''}</span>
         </div>
@@ -1154,14 +1156,14 @@
           >
             <Icon icon="mdi:download-circle" class="w-6 h-6 text-[#1db954]" />
             <div class="text-left">
-              <p class="text-sm font-medium text-[#1db954]">Update Available</p>
-              <p class="text-xs text-white/50">v{updateAvailable.version} - Click to download</p>
+              <p class="text-sm font-medium text-[#1db954]">{$t("settings.about.updateAvailable")}</p>
+              <p class="text-xs text-white/50">v{updateAvailable.version} - {$t("settings.about.clickToDownload")}</p>
             </div>
           </button>
         {:else}
           <div class="flex items-center gap-2 text-xs text-white/40">
             <Icon icon="mdi:check-circle" class="w-4 h-4 text-[#1db954]" />
-            <span>You're on the latest version</span>
+            <span>{$t("settings.about.latestVersion")}</span>
           </div>
         {/if}
       </div>
@@ -1186,23 +1188,23 @@
           <Icon icon="mdi:alert" class="w-5 h-5 text-orange-400" />
         </div>
         <div>
-          <h3 class="text-lg font-semibold text-white">Apply {KEY_PRESETS[pendingPreset].name} Layout?</h3>
+          <h3 class="text-lg font-semibold text-white">{$t("settings.presets.applyLayout", { values: { name: KEY_PRESETS[pendingPreset].name } })}</h3>
           <p class="text-sm text-white/60">{KEY_PRESETS[pendingPreset].desc}</p>
         </div>
       </div>
 
       <div class="bg-white/5 rounded-lg p-3 mb-4">
-        <p class="text-xs text-white/40 mb-2">This will set your keys to:</p>
+        <p class="text-xs text-white/40 mb-2">{$t("settings.presets.willSetKeysTo")}</p>
         <div class="space-y-1 text-sm font-mono">
-          <p><span class="text-white/40">High:</span> <span class="text-white uppercase">{KEY_PRESETS[pendingPreset].high.join(' ')}</span></p>
-          <p><span class="text-white/40">Mid:</span> <span class="text-white uppercase">{KEY_PRESETS[pendingPreset].mid.join(' ')}</span></p>
-          <p><span class="text-white/40">Low:</span> <span class="text-white uppercase">{KEY_PRESETS[pendingPreset].low.join(' ')}</span></p>
+          <p><span class="text-white/40">{$t("settings.presets.high")}</span> <span class="text-white uppercase">{KEY_PRESETS[pendingPreset].high.join(' ')}</span></p>
+          <p><span class="text-white/40">{$t("settings.presets.mid")}</span> <span class="text-white uppercase">{KEY_PRESETS[pendingPreset].mid.join(' ')}</span></p>
+          <p><span class="text-white/40">{$t("settings.presets.low")}</span> <span class="text-white uppercase">{KEY_PRESETS[pendingPreset].low.join(' ')}</span></p>
         </div>
       </div>
 
       <div class="flex items-center gap-2 p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 mb-4">
         <Icon icon="mdi:information" class="w-4 h-4 text-orange-400 flex-shrink-0" />
-        <p class="text-xs text-orange-300">This will override your current key bindings and cannot be undone.</p>
+        <p class="text-xs text-orange-300">{$t("settings.presets.overrideWarning")}</p>
       </div>
 
       <div class="flex gap-3">
@@ -1210,13 +1212,13 @@
           class="flex-1 py-2.5 px-4 rounded-lg bg-white/10 hover:bg-white/15 text-white font-medium transition-colors"
           onclick={cancelPreset}
         >
-          Cancel
+          {$t("common.cancel")}
         </button>
         <button
           class="flex-1 py-2.5 px-4 rounded-lg bg-[#1db954] hover:bg-[#1ed760] text-white font-medium transition-colors"
           onclick={applyPreset}
         >
-          Apply
+          {$t("common.apply")}
         </button>
       </div>
     </div>

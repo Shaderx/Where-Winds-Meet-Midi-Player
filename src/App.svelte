@@ -7,6 +7,11 @@
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
 
+  // i18n (must be imported early)
+  import "./lib/i18n";
+  import { t } from "svelte-i18n";
+  import { languages, currentLanguage, setLanguage, currentLanguageInfo, initUserLocales } from "./lib/i18n";
+
   // Current version
   import { APP_VERSION, APP_FLAVOR } from "./lib/version.js";
   import { recordingKeybind, isImportingFiles } from "./lib/stores/player.js";
@@ -236,17 +241,17 @@
   } from "./lib/stores/player.js";
 
 
-  // Note mode options for quick selector
-  const noteModeOptionsList = [
-    { id: "Python", title: "YueLyn", short: "YL", icon: "mdi:heart", desc: "YueLyn's favorite play mode", rmd21: true },
-    { id: "Closest", short: "CLS", icon: "mdi:target", desc: "Best fit for most songs" },
-    { id: "Wide", short: "WDE", icon: "mdi:arrow-expand-horizontal", desc: "Uses high/low rows more" },
-    { id: "Sharps", short: "SHP", icon: "mdi:music-accidental-sharp", desc: "36-key: Shift/Ctrl for sharps", rmd36: true },
-    { id: "Quantize", short: "QNT", icon: "mdi:grid", desc: "Snap to scale notes" },
-    { id: "TransposeOnly", short: "TRP", icon: "mdi:arrow-up-down", desc: "Direct octave shift" },
-    { id: "Pentatonic", short: "PEN", icon: "mdi:music", desc: "5-note scale mapping" },
-    { id: "Chromatic", short: "CHR", icon: "mdi:piano", desc: "12 to 7 key mapping" },
-    { id: "Raw", short: "RAW", icon: "mdi:code-braces", desc: "1:1 direct, no processing" },
+  // Note mode options for quick selector (reactive for i18n)
+  $: noteModeOptionsList = [
+    { id: "Python", title: $t("noteMode.yuelyn"), short: "YL", icon: "mdi:heart", desc: $t("noteMode.yuelynDesc"), rmd21: true },
+    { id: "Closest", title: $t("noteMode.closest"), short: "CLS", icon: "mdi:target", desc: $t("noteMode.closestDesc") },
+    { id: "Wide", title: $t("noteMode.wide"), short: "WDE", icon: "mdi:arrow-expand-horizontal", desc: $t("noteMode.wideDesc") },
+    { id: "Sharps", title: $t("noteMode.sharps"), short: "SHP", icon: "mdi:music-accidental-sharp", desc: $t("noteMode.sharpsDesc"), rmd36: true },
+    { id: "Quantize", title: $t("noteMode.quantize"), short: "QNT", icon: "mdi:grid", desc: $t("noteMode.quantizeDesc") },
+    { id: "TransposeOnly", title: $t("noteMode.transposeOnly"), short: "TRP", icon: "mdi:arrow-up-down", desc: $t("noteMode.transposeOnlyDesc") },
+    { id: "Pentatonic", title: $t("noteMode.pentatonic"), short: "PEN", icon: "mdi:music", desc: $t("noteMode.pentatonicDesc") },
+    { id: "Chromatic", title: $t("noteMode.chromatic"), short: "CHR", icon: "mdi:piano", desc: $t("noteMode.chromaticDesc") },
+    { id: "Raw", title: $t("noteMode.raw"), short: "RAW", icon: "mdi:code-braces", desc: $t("noteMode.rawDesc") },
   ];
 
   // Reactive: show RMD based on key mode
@@ -258,6 +263,7 @@
   let showModeMenu = false;
   let showSpeedMenu = false;
   let showTrackMenu = false;
+  let showLanguageMenu = false;
   let showVisualizer = false;
   let showUpdateModal = false;
   let showLargeLibraryModal = false;
@@ -337,32 +343,32 @@
   }
 
   $: musicNavItems = [
-    { id: "library", icon: "mdi:library-music", label: "Library", badge: 0 },
-    { id: "queue", icon: "mdi:playlist-play", label: "Queue", badge: queueCount },
-    { id: "favorites", icon: "mdi:heart", label: "Favorites", badge: favoritesCount },
-    { id: "playlists", icon: "mdi:folder-music", label: "Playlists", badge: playlistsCount },
+    { id: "library", icon: "mdi:library-music", label: $t("nav.library"), badge: 0 },
+    { id: "queue", icon: "mdi:playlist-play", label: $t("nav.queue"), badge: queueCount },
+    { id: "favorites", icon: "mdi:heart", label: $t("nav.favorites"), badge: favoritesCount },
+    { id: "playlists", icon: "mdi:folder-music", label: $t("nav.playlists"), badge: playlistsCount },
   ];
 
   $: onlineNavItems = [
-    { id: "band", icon: "mdi:account-group", label: "Band", badge: bandPeersCount, status: $bandStatus },
-    { id: "share", icon: "mdi:earth", label: "Share", badge: libraryPeersCount, status: $libraryConnected ? 'connected' : 'disconnected' },
+    { id: "band", icon: "mdi:account-group", label: $t("nav.band"), badge: bandPeersCount, status: $bandStatus },
+    { id: "share", icon: "mdi:earth", label: $t("nav.share"), badge: libraryPeersCount, status: $libraryConnected ? 'connected' : 'disconnected' },
   ];
 
   $: appNavItems = [
-    { id: "live", icon: "mdi:piano", label: "Live Play", badge: 0 },
-    { id: "settings", icon: "mdi:cog", label: "Settings", badge: 0 },
-    { id: "stats", icon: "mdi:chart-bar", label: "Stats", badge: 0 },
+    { id: "live", icon: "mdi:piano", label: $t("nav.livePlay"), badge: 0 },
+    { id: "settings", icon: "mdi:cog", label: $t("nav.settings"), badge: 0 },
+    { id: "stats", icon: "mdi:chart-bar", label: $t("nav.stats"), badge: 0 },
   ];
 
   $: navItems = sidebarTab === "music" ? musicNavItems : sidebarTab === "online" ? onlineNavItems : appNavItems;
 
   // Reactive shortcuts based on custom keybindings
   $: shortcuts = [
-    { action: "Play / Pause", key: keybindings.pause_resume },
-    { action: "Stop", key: `${keybindings.stop} / End` },
-    { action: "Previous", key: keybindings.previous },
-    { action: "Next", key: keybindings.next },
-    { action: "Mode", key: `${keybindings.mode_prev} / ${keybindings.mode_next}` },
+    { action: $t("controls.playPause"), key: keybindings.pause_resume },
+    { action: $t("player.stop"), key: `${keybindings.stop} / End` },
+    { action: $t("player.previous"), key: keybindings.previous },
+    { action: $t("player.next"), key: keybindings.next },
+    { action: $t("controls.mode"), key: `${keybindings.mode_prev} / ${keybindings.mode_next}` },
   ];
 
   // Check if current song is favorited
@@ -397,6 +403,7 @@
 
   onMount(async () => {
     await loadWindowPosition(); // Restore window position
+    initUserLocales(); // Initialize user locale files (async, don't await)
 
     // Check library size AND cache status before loading
     const { needsWarning, isLarge, count, isCached } = await shouldShowLibraryWarning();
@@ -480,8 +487,8 @@
     };
   });
 
-  const filename = (path) => {
-    if (!path) return "No track selected";
+  const filename = (path, fallback) => {
+    if (!path) return fallback;
     const parts = path.split(/[\\/]/);
     return parts[parts.length - 1] || path;
   };
@@ -708,10 +715,10 @@
             <button
               onclick={() => invoke('open_url', { url: 'https://ko-fi.com/snowiy' })}
               class="flex items-center gap-2 px-3 py-2 rounded-lg text-white/60 hover:text-[#ff5e5b] hover:bg-[#ff5e5b]/10 transition-all w-full mt-1"
-              title="Support me on Ko-fi"
+              title={$t("common.supportOnKofi")}
             >
               <Icon icon="simple-icons:kofi" class="w-4 h-4" />
-              <span class="text-xs">Support on Ko-fi</span>
+              <span class="text-xs">{$t("common.supportOnKofi")}</span>
             </button>
             <!-- Keyboard Shortcuts Info -->
             <div class="px-3 py-3 bg-white/5 rounded-lg mt-2">
@@ -719,7 +726,7 @@
                 class="text-xs font-semibold text-white/60 mb-2 flex items-center gap-2"
               >
                 <Icon icon="mdi:keyboard" class="w-4 h-4" />
-                Shortcuts
+                {$t("settings.shortcuts.title")}
               </p>
               <div class="space-y-1">
                 {#each shortcuts.slice(0, 4) as shortcut}
@@ -789,7 +796,7 @@
           <div class="flex items-center gap-4 w-64">
             <div
               class="relative w-12 h-12 rounded bg-white/5 flex items-center justify-center flex-shrink-0"
-              title={gameFound ? "Game window found" : "Game window not found"}
+              title={gameFound ? $t("common.gameFound") : $t("common.gameNotFound")}
             >
               {#if $currentFile}
                 <Icon icon="mdi:music-note" class="w-6 h-6 text-[#1db954]" />
@@ -800,23 +807,23 @@
               <div class="absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-[#121212] {gameFound ? 'bg-[#1db954]' : 'bg-red-500'} {gameFound && $isPlaying ? 'animate-pulse' : ''}"></div>
               <!-- Library Mode Indicator Dot -->
               {#if $libraryPlayMode}
-                <div class="absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-[#121212] bg-purple-500" title="Library Play Mode"></div>
+                <div class="absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-[#121212] bg-purple-500" title={$t("player.libraryPlayMode")}></div>
               {/if}
             </div>
             <div class="min-w-0 flex-1">
               <p class="text-sm font-semibold truncate text-white/90">
-                {filename($currentFile)}
+                {filename($currentFile, $t("player.noTrackSelected"))}
               </p>
               <p class="text-xs text-white/50 truncate">
                 {#if $libraryPlayMode}
                   <span class="text-purple-400 flex items-center gap-1">
                     <Icon icon={$libraryPlayShuffle ? "mdi:shuffle" : "mdi:library-music"} class="w-3 h-3 inline" />
-                    {$libraryPlayShuffle ? 'Shuffle' : 'Library'} • {($libraryPlayIndex + 1).toLocaleString()} / {$midiFiles.length.toLocaleString()}
+                    {$libraryPlayShuffle ? $t("player.shuffle") : $t("nav.library")} • {($libraryPlayIndex + 1).toLocaleString()} / {$midiFiles.length.toLocaleString()}
                   </span>
                 {:else if $playlist.length > 0}
-                  {$playlist.length} tracks in queue
+                  {$playlist.length} {$t("library.tracks")}
                 {:else}
-                  No tracks in queue
+                  {$t("player.noTrackSelected")}
                 {/if}
               </p>
             </div>
@@ -938,14 +945,14 @@
                   <button
                     class="flex items-center gap-1 px-2 py-1 rounded-md transition-colors text-xs font-medium {$selectedTrackId !== null ? 'bg-purple-500/20 text-purple-400' : 'text-white/50 hover:text-white hover:bg-white/5'}"
                     onclick={() => showTrackMenu = !showTrackMenu}
-                    title="Select track to play"
+                    title={$t("trackSelector.selectTrack")}
                   >
                     <Icon icon="mdi:playlist-music" class="w-3.5 h-3.5" />
                     <span class="max-w-[60px] truncate">
                       {#if $selectedTrackId === null}
-                        All
+                        {$t("trackSelector.all")}
                       {:else}
-                        {$availableTracks.find(t => t.id === $selectedTrackId)?.name || `Track ${$selectedTrackId + 1}`}
+                        {$availableTracks.find(t => t.id === $selectedTrackId)?.name || $t("trackSelector.trackNum", { values: { num: $selectedTrackId + 1 } })}
                       {/if}
                     </span>
                   </button>
@@ -964,8 +971,8 @@
                         >
                           <Icon icon="mdi:playlist-play" class="w-4 h-4 flex-shrink-0 {$selectedTrackId === null ? 'text-purple-400' : 'text-white/50'}" />
                           <div class="flex-1 min-w-0">
-                            <div class="text-sm font-medium {$selectedTrackId === null ? 'text-purple-400' : 'text-white/90'}">All Tracks</div>
-                            <div class="text-xs {$selectedTrackId === null ? 'text-purple-400/70' : 'text-white/40'}">Play everything</div>
+                            <div class="text-sm font-medium {$selectedTrackId === null ? 'text-purple-400' : 'text-white/90'}">{$t("trackSelector.allTracks")}</div>
+                            <div class="text-xs {$selectedTrackId === null ? 'text-purple-400/70' : 'text-white/40'}">{$t("trackSelector.playEverything")}</div>
                           </div>
                           {#if $selectedTrackId === null}
                             <Icon icon="mdi:check" class="w-4 h-4 text-purple-400 flex-shrink-0" />
@@ -982,7 +989,7 @@
                             <Icon icon="mdi:music-note" class="w-4 h-4 flex-shrink-0 {$selectedTrackId === track.id ? 'text-purple-400' : 'text-white/50'}" />
                             <div class="flex-1 min-w-0">
                               <div class="text-sm font-medium truncate {$selectedTrackId === track.id ? 'text-purple-400' : 'text-white/90'}">{track.name}</div>
-                              <div class="text-xs {$selectedTrackId === track.id ? 'text-purple-400/70' : 'text-white/40'}">{track.note_count} notes</div>
+                              <div class="text-xs {$selectedTrackId === track.id ? 'text-purple-400/70' : 'text-white/40'}">{$t("trackSelector.notes", { values: { count: track.note_count } })}</div>
                             </div>
                             {#if $selectedTrackId === track.id}
                               <Icon icon="mdi:check" class="w-4 h-4 text-purple-400 flex-shrink-0" />
@@ -1016,6 +1023,38 @@
                   <span>v{updateAvailable.version}</span>
                 </button>
               {/if}
+
+              <!-- Language Switcher -->
+              <div class="relative">
+                <button
+                  class="flex items-center gap-1 px-2 py-1 rounded-md transition-colors text-xs font-medium text-white/50 hover:text-white hover:bg-white/5"
+                  onclick={() => showLanguageMenu = !showLanguageMenu}
+                  title="Language"
+                >
+                  <Icon icon={$currentLanguageInfo?.flag || 'circle-flags:us'} class="w-4 h-4" />
+                </button>
+                {#if showLanguageMenu}
+                  <button class="fixed inset-0 z-40" onclick={() => showLanguageMenu = false}></button>
+                  <div
+                    class="absolute bottom-full right-0 mb-2 bg-[#282828] rounded-lg shadow-xl border border-white/10 overflow-hidden z-50 min-w-[140px]"
+                    in:fly={{ y: 10, duration: 150 }}
+                    out:fade={{ duration: 100 }}
+                  >
+                    {#each languages as lang}
+                      <button
+                        class="w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors {$currentLanguage === lang.code ? 'bg-[#1db954]/20 text-[#1db954]' : 'text-white/80 hover:bg-white/5'}"
+                        onclick={() => { setLanguage(lang.code); showLanguageMenu = false; }}
+                      >
+                        <Icon icon={lang.flag} class="w-4 h-4" />
+                        <span>{lang.name}</span>
+                        {#if $currentLanguage === lang.code}
+                          <Icon icon="mdi:check" class="w-4 h-4 ml-auto" />
+                        {/if}
+                      </button>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
             </div>
           </div>
 
@@ -1060,7 +1099,7 @@
     >
       <!-- Header -->
       <div class="flex items-center justify-between p-4 border-b border-white/10">
-        <h3 class="text-lg font-bold">Update Available</h3>
+        <h3 class="text-lg font-bold">{$t("modals.update.title")}</h3>
         {#if updateStatus === 'idle' || updateStatus === 'downloaded' || updateStatus === 'error'}
           <button
             class="p-1 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-colors"
@@ -1089,7 +1128,7 @@
           </div>
           <div>
             <p class="text-2xl font-bold text-[#1db954]">v{updateAvailable.version}</p>
-            <p class="text-sm text-white/50">Current: v{APP_VERSION}{APP_FLAVOR ? `(${APP_FLAVOR})` : ''}</p>
+            <p class="text-sm text-white/50">{$t("modals.update.current")} v{APP_VERSION}{APP_FLAVOR ? `(${APP_FLAVOR})` : ''}</p>
           </div>
         </div>
 
@@ -1098,13 +1137,13 @@
             <p class="text-sm text-red-400">{updateError}</p>
           </div>
         {:else if updateStatus === 'downloading'}
-          <p class="text-sm text-white/70">Downloading update... Please wait.</p>
+          <p class="text-sm text-white/70">{$t("modals.update.downloading")}</p>
         {:else if updateStatus === 'downloaded'}
-          <p class="text-sm text-white/70">Download complete! Click "Install & Restart" to apply the update, or restart later manually.</p>
+          <p class="text-sm text-white/70">{$t("modals.update.downloadComplete")}</p>
         {:else if updateStatus === 'installing'}
-          <p class="text-sm text-white/70">Installing update... The app will restart automatically.</p>
+          <p class="text-sm text-white/70">{$t("modals.update.installing")}</p>
         {:else}
-          <p class="text-sm text-white/70">A new version is available! Download and install automatically, or download manually from GitHub.</p>
+          <p class="text-sm text-white/70">{$t("modals.update.newVersionAvailable")}</p>
         {/if}
 
         <!-- Action Buttons -->
@@ -1114,14 +1153,14 @@
               class="flex-1 px-4 py-2.5 rounded-lg bg-white/10 hover:bg-white/15 text-white font-medium text-sm transition-colors"
               onclick={() => invoke('open_url', { url: updateAvailable.release_url })}
             >
-              Manual
+              {$t("modals.update.manual")}
             </button>
             <button
               class="flex-1 px-4 py-2.5 rounded-lg bg-[#1db954] hover:bg-[#1ed760] text-white font-medium text-sm transition-colors flex items-center justify-center gap-2"
               onclick={downloadUpdate}
             >
               <Icon icon="mdi:download" class="w-4 h-4" />
-              Auto Update
+              {$t("modals.update.autoUpdate")}
             </button>
           {:else if updateStatus === 'downloading'}
             <button
@@ -1129,21 +1168,21 @@
               disabled
             >
               <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
-              Downloading...
+              {$t("common.loading")}
             </button>
           {:else if updateStatus === 'downloaded'}
             <button
               class="flex-1 px-4 py-2.5 rounded-lg bg-white/10 hover:bg-white/15 text-white font-medium text-sm transition-colors"
               onclick={() => showUpdateModal = false}
             >
-              Later
+              {$t("modals.update.later")}
             </button>
             <button
               class="flex-1 px-4 py-2.5 rounded-lg bg-[#1db954] hover:bg-[#1ed760] text-white font-medium text-sm transition-colors flex items-center justify-center gap-2"
               onclick={installUpdate}
             >
               <Icon icon="mdi:restart" class="w-4 h-4" />
-              Install & Restart
+              {$t("modals.update.installRestart")}
             </button>
           {:else if updateStatus === 'installing'}
             <button
@@ -1151,20 +1190,20 @@
               disabled
             >
               <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
-              Installing...
+              {$t("common.loading")}
             </button>
           {:else if updateStatus === 'error'}
             <button
               class="flex-1 px-4 py-2.5 rounded-lg bg-white/10 hover:bg-white/15 text-white font-medium text-sm transition-colors"
               onclick={() => { updateStatus = 'idle'; updateError = ''; }}
             >
-              Try Again
+              {$t("modals.update.tryAgain")}
             </button>
             <button
               class="flex-1 px-4 py-2.5 rounded-lg bg-white/10 hover:bg-white/15 text-white font-medium text-sm transition-colors"
               onclick={() => invoke('open_url', { url: updateAvailable.release_url })}
             >
-              Manual Download
+              {$t("modals.update.manualDownload")}
             </button>
           {/if}
         </div>
@@ -1191,7 +1230,7 @@
       <div class="flex items-center justify-between p-4 border-b border-white/10">
         <h3 class="text-lg font-bold flex items-center gap-2">
           <Icon icon="mdi:alert-circle" class="w-5 h-5 text-yellow-400" />
-          Large Library Detected
+          {$t("modals.largeLibrary.title")}
         </h3>
       </div>
 
@@ -1203,23 +1242,23 @@
           </div>
           <div>
             <p class="text-2xl font-bold text-yellow-400">{largeLibraryCount.toLocaleString()}</p>
-            <p class="text-sm text-white/50">MIDI files found</p>
+            <p class="text-sm text-white/50">{$t("modals.largeLibrary.filesFound")}</p>
           </div>
         </div>
 
         <p class="text-sm text-white/70">
-          Your library has a lot of files. Loading all of them at once may take a while and use significant memory.
+          {$t("modals.largeLibrary.description")}
         </p>
 
         <div class="p-3 rounded-lg bg-white/5">
-          <p class="text-xs text-white/50 mb-2">Recommendation:</p>
+          <p class="text-xs text-white/50 mb-2">{$t("modals.largeLibrary.recommendation")}</p>
           <p class="text-sm text-white/70">
-            Load 2,000 files at a time. You can always load more later from the library view.
+            {$t("modals.largeLibrary.recommendationText")}
           </p>
         </div>
 
         <p class="text-xs text-white/40 italic">
-          This message only shows once. After loading, files are cached for instant startup.
+          {$t("modals.largeLibrary.onceMessage")}
         </p>
 
         <!-- Action Buttons -->
@@ -1232,7 +1271,7 @@
             }}
           >
             <Icon icon="mdi:lightning-bolt" class="w-4 h-4" />
-            Load 2,000 (Recommended)
+            {$t("modals.largeLibrary.loadRecommended")}
           </button>
           <button
             class="flex-1 px-4 py-2.5 rounded-lg bg-white/10 hover:bg-white/15 text-white/70 font-medium text-sm transition-colors flex items-center justify-center gap-2"
@@ -1242,7 +1281,7 @@
             }}
           >
             <Icon icon="mdi:download" class="w-4 h-4" />
-            Load All
+            {$t("modals.largeLibrary.loadAll")}
           </button>
         </div>
       </div>
@@ -1258,7 +1297,7 @@
   >
     <div class="text-center">
       <Icon icon="mdi:loading" class="w-12 h-12 text-[#1db954] mx-auto mb-4 animate-spin" />
-      <p class="text-lg font-semibold">Importing files...</p>
+      <p class="text-lg font-semibold">{$t("modals.importing.title")}</p>
     </div>
   </div>
 {/if}
@@ -1272,7 +1311,7 @@
     <div class="p-2.5 rounded-lg bg-[#1db954]/15 border border-[#1db954]/30 backdrop-blur-md flex items-center gap-3">
       <Icon icon="mdi:upload" class="w-4 h-4 text-[#1db954] flex-shrink-0" />
       <p class="text-xs text-white/90 flex-1 truncate">
-        <span class="text-[#1db954] font-medium">{$shareNotification.peerName}</span> downloaded <span class="text-white/70">{$shareNotification.songName}</span>
+        <span class="text-[#1db954] font-medium">{$shareNotification.peerName}</span> {$t("share.downloaded")} <span class="text-white/70">{$shareNotification.songName}</span>
       </p>
       <button
         class="text-white/40 hover:text-white transition-colors flex-shrink-0"

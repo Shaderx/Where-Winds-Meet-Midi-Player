@@ -2,6 +2,7 @@
   import Icon from "@iconify/svelte";
   import { fade, fly, scale } from "svelte/transition";
   import { onMount } from "svelte";
+  import { t } from "svelte-i18n";
   import SearchSort from "./SearchSort.svelte";
   import {
     libraryEnabled,
@@ -260,12 +261,12 @@
           <Icon icon="mdi:earth" class="w-6 h-6 text-[#1db954]" />
         </div>
         <div class="flex-1">
-          <h2 class="text-xl font-bold">Song Library</h2>
+          <h2 class="text-xl font-bold">{$t("share.songLibrary")}</h2>
           <p class="text-xs text-white/60">
             {#if $libraryConnected}
-              {$onlinePeers} peer{$onlinePeers !== 1 ? 's' : ''} online &bull; {$globalSongs.length} songs
+              {$onlinePeers} {$onlinePeers !== 1 ? $t("share.peersOnlinePlural") : $t("share.peersOnline")} &bull; {$globalSongs.length} {$t("library.songs")}
             {:else}
-              Browse & share songs globally
+              {$t("share.browseShare")}
             {/if}
           </p>
         </div>
@@ -273,7 +274,7 @@
         <button
           class="w-10 h-5 rounded-full transition-colors {$libraryEnabled ? 'bg-[#1db954]' : 'bg-white/20'}"
           onclick={toggleLibrary}
-          title={$libraryEnabled ? "Disable sharing" : "Enable sharing"}
+          title={$libraryEnabled ? $t("share.disableSharing") : $t("share.enableSharing")}
         >
           <div class="w-4 h-4 rounded-full bg-white transition-transform {$libraryEnabled ? 'translate-x-5' : 'translate-x-0.5'}"></div>
         </button>
@@ -286,13 +287,13 @@
         <div class="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
           <Icon icon="mdi:share-off" class="w-8 h-8 text-white/30" />
         </div>
-        <p class="text-white/60 mb-2">Library sharing is disabled</p>
-        <p class="text-xs text-white/40 mb-4">Enable to browse and share songs with others</p>
+        <p class="text-white/60 mb-2">{$t("share.sharingDisabled")}</p>
+        <p class="text-xs text-white/40 mb-4">{$t("share.enableToShare")}</p>
         <button
           class="px-4 py-2 rounded-lg bg-[#1db954] hover:bg-[#1ed760] text-white font-medium text-sm transition-colors"
           onclick={toggleLibrary}
         >
-          Enable Sharing
+          {$t("share.enableSharing")}
         </button>
       </div>
     {:else if !$libraryConnected}
@@ -306,7 +307,7 @@
           >
             <span class="flex items-center gap-2">
               <Icon icon="mdi:developer-board" class="w-3.5 h-3.5" />
-              Developer Settings
+              {$t("share.devSettings")}
             </span>
             <Icon icon={showDevSettings ? "mdi:chevron-up" : "mdi:chevron-down"} class="w-4 h-4" />
           </button>
@@ -315,7 +316,7 @@
             <div class="mt-3 pt-3 border-t border-white/10 space-y-3" transition:fade={{ duration: 150 }}>
               <!-- Discovery Server URL -->
               <div class="space-y-1">
-                <label class="text-xs text-white/50">Discovery Server URL</label>
+                <label class="text-xs text-white/50">{$t("share.discoveryUrl")}</label>
                 <div class="flex gap-2">
                   <input
                     type="text"
@@ -327,12 +328,12 @@
                     class="px-3 py-1.5 rounded-lg bg-[#1db954] hover:bg-[#1ed760] text-white text-xs font-medium transition-colors"
                     onclick={saveServerUrl}
                   >
-                    Save
+                    {$t("share.save")}
                   </button>
                   <button
                     class="px-2 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 hover:text-white text-xs transition-colors"
                     onclick={() => { serverUrlInput = 'https://discovery.chuaii.me'; saveServerUrl(); }}
-                    title="Reset to default"
+                    title={$t("settings.storage.resetToDefault")}
                   >
                     <Icon icon="mdi:refresh" class="w-3.5 h-3.5" />
                   </button>
@@ -341,7 +342,7 @@
 
               <!-- Host Server -->
               <div class="space-y-1">
-                <label class="text-xs text-white/50">Host Discovery Server</label>
+                <label class="text-xs text-white/50">{$t("share.hostServer")}</label>
                 <div class="flex gap-2 items-center">
                   <input
                     type="number"
@@ -354,18 +355,18 @@
                       class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-red-500/20 text-red-400 hover:bg-red-500/30"
                       onclick={handleStopServer}
                     >
-                      Stop Server
+                      {$t("share.stopServer")}
                     </button>
                   {:else}
                     <button
                       class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-white/10 hover:bg-white/20 text-white"
                       onclick={handleStartServer}
                     >
-                      Start Server
+                      {$t("share.startServer")}
                     </button>
                   {/if}
                 </div>
-                <p class="text-xs text-white/40">Run a discovery server on this machine</p>
+                <p class="text-xs text-white/40">{$t("share.runOnMachine")}</p>
               </div>
             </div>
           {/if}
@@ -374,7 +375,7 @@
         <!-- Connecting spinner -->
         <div class="flex flex-col items-center justify-center py-8 text-center">
           <Icon icon="mdi:loading" class="w-12 h-12 text-[#1db954] animate-spin mb-4" />
-          <p class="text-white/60">Connecting to network...</p>
+          <p class="text-white/60">{$t("share.connecting")}</p>
         </div>
 
         <!-- Error Display -->
@@ -386,7 +387,7 @@
               class="text-xs text-red-400 hover:text-red-300"
               onclick={() => libraryError.set(null)}
             >
-              Dismiss
+              {$t("share.dismiss")}
             </button>
           </div>
         {/if}
@@ -399,17 +400,17 @@
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
               <div class="w-2 h-2 rounded-full bg-[#1db954] animate-pulse"></div>
-              <span class="text-xs text-white/70">Connected</span>
+              <span class="text-xs text-white/70">{$t("share.connected")}</span>
               <span class="text-xs text-white/40">•</span>
-              <span class="text-xs text-[#1db954]">Sharing {sharedCount} song{sharedCount !== 1 ? 's' : ''}</span>
+              <span class="text-xs text-[#1db954]">{$t("share.sharing")} {sharedCount} {sharedCount !== 1 ? $t("library.songs") : $t("library.song")}</span>
             </div>
             <button
               class="text-xs text-white/50 hover:text-white transition-colors flex items-center gap-1"
               onclick={refreshSongs}
-              title="Refresh song list"
+              title={$t("share.refreshSongs")}
             >
               <Icon icon="mdi:refresh" class="w-3 h-3" />
-              Refresh
+              {$t("share.refresh")}
             </button>
             {#if import.meta.env.DEV}
               <!-- DEV: Test notification button -->
@@ -430,7 +431,7 @@
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
                 <Icon icon="mdi:share-variant" class="w-3.5 h-3.5 text-white/50" />
-                <span class="text-xs text-white/70">Share all songs</span>
+                <span class="text-xs text-white/70">{$t("share.shareAll")}</span>
               </div>
               <button
                 class="w-8 h-4 rounded-full transition-colors {$shareAll ? 'bg-[#1db954]' : 'bg-white/20'}"
@@ -448,9 +449,9 @@
               >
                 <span class="flex items-center gap-2">
                   <Icon icon="mdi:playlist-check" class="w-3.5 h-3.5" />
-                  Select songs to share
+                  {$t("share.selectToShare")}
                 </span>
-                <span class="text-white/50">{sharedCount} selected</span>
+                <span class="text-white/50">{sharedCount} {$t("share.selected")}</span>
               </button>
             {/if}
           </div>
@@ -464,7 +465,7 @@
           >
             <span class="flex items-center gap-2">
               <Icon icon="mdi:developer-board" class="w-3.5 h-3.5" />
-              Developer Settings
+              {$t("share.devSettings")}
             </span>
             <Icon icon={showDevSettings ? "mdi:chevron-up" : "mdi:chevron-down"} class="w-4 h-4" />
           </button>
@@ -473,7 +474,7 @@
             <div class="mt-3 pt-3 border-t border-white/10 space-y-3" transition:fade={{ duration: 150 }}>
               <!-- Discovery Server URL -->
               <div class="space-y-1">
-                <label class="text-xs text-white/50">Discovery Server URL</label>
+                <label class="text-xs text-white/50">{$t("share.discoveryUrl")}</label>
                 <div class="flex gap-2">
                   <input
                     type="text"
@@ -485,12 +486,12 @@
                     class="px-3 py-1.5 rounded-lg bg-[#1db954] hover:bg-[#1ed760] text-white text-xs font-medium transition-colors"
                     onclick={saveServerUrl}
                   >
-                    Save
+                    {$t("share.save")}
                   </button>
                   <button
                     class="px-2 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 hover:text-white text-xs transition-colors"
                     onclick={() => { serverUrlInput = 'https://discovery.chuaii.me'; saveServerUrl(); }}
-                    title="Reset to default"
+                    title={$t("settings.storage.resetToDefault")}
                   >
                     <Icon icon="mdi:refresh" class="w-3.5 h-3.5" />
                   </button>
@@ -499,7 +500,7 @@
 
               <!-- Host Server -->
               <div class="space-y-1">
-                <label class="text-xs text-white/50">Host Discovery Server</label>
+                <label class="text-xs text-white/50">{$t("share.hostServer")}</label>
                 <div class="flex gap-2 items-center">
                   <input
                     type="number"
@@ -512,18 +513,18 @@
                       class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-red-500/20 text-red-400 hover:bg-red-500/30"
                       onclick={handleStopServer}
                     >
-                      Stop Server
+                      {$t("share.stopServer")}
                     </button>
                   {:else}
                     <button
                       class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-white/10 hover:bg-white/20 text-white"
                       onclick={handleStartServer}
                     >
-                      Start Server
+                      {$t("share.startServer")}
                     </button>
                   {/if}
                 </div>
-                <p class="text-xs text-white/40">Run a discovery server on this machine</p>
+                <p class="text-xs text-white/40">{$t("share.runOnMachine")}</p>
               </div>
             </div>
           {/if}
@@ -534,7 +535,7 @@
           <SearchSort
             bind:searchQuery={searchQuery}
             bind:sortBy={librarySortBy}
-            placeholder="Search {$globalSongs.length} available songs..."
+            placeholder={$t("share.searchAvailableSongs", { values: { count: $globalSongs.length } })}
             sortOptions={librarySortOptions}
           />
         {/if}
@@ -590,7 +591,7 @@
                 <div class="flex-shrink-0 flex items-center">
                   {#if hasIt}
                     <span class="text-xs text-[#1db954] font-medium px-2 py-1 rounded-full bg-[#1db954]/10">
-                      Owned
+                      {$t("share.owned")}
                     </span>
                   {:else if isDownloading}
                     <div class="flex items-center gap-2 px-2 py-1 rounded-full bg-[#1db954]/10">
@@ -599,7 +600,7 @@
                   {:else}
                     <div class="flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#1db954] text-white text-xs font-medium">
                       <Icon icon="mdi:download" class="w-4 h-4" />
-                      <span>Get</span>
+                      <span>{$t("share.get")}</span>
                     </div>
                   {/if}
                 </div>
@@ -609,13 +610,13 @@
         {:else if $globalSongs.length === 0}
           <div class="p-4 rounded-lg bg-white/5 text-center">
             <Icon icon="mdi:music-note-off" class="w-8 h-8 text-white/30 mx-auto mb-2" />
-            <p class="text-xs text-white/50">No songs from other users yet</p>
-            <p class="text-xs text-white/40 mt-1">Your {sharedCount} song{sharedCount !== 1 ? 's are' : ' is'} visible to others</p>
+            <p class="text-xs text-white/50">{$t("share.noSongsFromOthers")}</p>
+            <p class="text-xs text-white/40 mt-1">{$t("share.yourSongsVisible", { values: { count: sharedCount } })}</p>
           </div>
         {:else}
           <div class="p-4 rounded-lg bg-white/5 text-center">
             <Icon icon="mdi:magnify" class="w-8 h-8 text-white/30 mx-auto mb-2" />
-            <p class="text-xs text-white/50">No songs match "{searchQuery}"</p>
+            <p class="text-xs text-white/50">{$t("share.noSongsMatch")} "{searchQuery}"</p>
           </div>
         {/if}
       </div>
@@ -652,7 +653,7 @@
               class="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-500/10 transition-colors"
               onclick={() => libraryError.set(null)}
             >
-              Dismiss
+              {$t("share.dismiss")}
             </button>
           </div>
         {/if}
@@ -681,11 +682,11 @@
           <Icon icon="mdi:arrow-left" class="w-5 h-5" />
         </button>
         <div>
-          <h2 class="text-lg font-bold">Select Songs to Share</h2>
+          <h2 class="text-lg font-bold">{$t("share.selectSongsToShare")}</h2>
           <p class="text-xs text-white/50">
-            <span class="text-[#1db954] font-semibold">{$sharedSongs.length.toLocaleString()}</span> of {$midiFiles.length.toLocaleString()} selected
+            <span class="text-[#1db954] font-semibold">{$sharedSongs.length.toLocaleString()}</span> {$t("share.ofSelected", { values: { total: $midiFiles.length.toLocaleString() } })}
             {#if sharePickerSongs.length !== $midiFiles.length}
-              <span class="text-white/30 ml-2">• Showing {sharePickerSongs.length.toLocaleString()}</span>
+              <span class="text-white/30 ml-2">• {$t("share.showing", { values: { count: sharePickerSongs.length.toLocaleString() } })}</span>
             {/if}
           </p>
         </div>
@@ -697,7 +698,7 @@
         onclick={() => { showSharePicker = false; resetShareFilters(); }}
       >
         <Icon icon="mdi:check" class="w-4 h-4" />
-        Done
+        {$t("share.done")}
       </button>
     </div>
 
@@ -733,7 +734,7 @@
           <SearchSort
             bind:searchQuery={shareSearchQuery}
             bind:sortBy={shareSortBy}
-            placeholder="Search songs..."
+            placeholder={$t("library.searchPlaceholder")}
             sortOptions={shareSortOptions}
           />
 
@@ -745,19 +746,19 @@
                 class="px-3 py-1.5 rounded-md text-xs font-medium transition-all {shareFilterMode === 'all' ? 'bg-white/15 text-white' : 'text-white/50 hover:text-white'}"
                 onclick={() => shareFilterMode = 'all'}
               >
-                All
+                {$t("band.all")}
               </button>
               <button
                 class="px-3 py-1.5 rounded-md text-xs font-medium transition-all {shareFilterMode === 'selected' ? 'bg-[#1db954]/30 text-[#1db954]' : 'text-white/50 hover:text-white'}"
                 onclick={() => shareFilterMode = 'selected'}
               >
-                Selected ({$sharedSongs.length})
+                {$t("share.selected")} ({$sharedSongs.length})
               </button>
               <button
                 class="px-3 py-1.5 rounded-md text-xs font-medium transition-all {shareFilterMode === 'unselected' ? 'bg-orange-500/30 text-orange-400' : 'text-white/50 hover:text-white'}"
                 onclick={() => shareFilterMode = 'unselected'}
               >
-                Unselected
+                {$t("share.unselected")}
               </button>
             </div>
 
@@ -769,26 +770,26 @@
               onclick={selectVisibleSongs}
             >
               <Icon icon="mdi:check-all" class="w-4 h-4" />
-              Select Shown
+              {$t("share.selectShown")}
             </button>
             <button
               class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-white/60 hover:text-white font-medium transition-colors flex items-center gap-1.5"
               onclick={deselectVisibleSongs}
             >
               <Icon icon="mdi:close" class="w-4 h-4" />
-              Deselect Shown
+              {$t("share.deselectShown")}
             </button>
             <button
               class="px-3 py-1.5 rounded-lg bg-[#1db954]/10 hover:bg-[#1db954]/20 text-xs text-[#1db954] font-medium transition-colors"
               onclick={selectAllSongs}
             >
-              All {$midiFiles.length.toLocaleString()}
+              {$t("band.all")} {$midiFiles.length.toLocaleString()}
             </button>
             <button
               class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-white/60 hover:text-white font-medium transition-colors"
               onclick={deselectAllSongs}
             >
-              None
+              {$t("share.none")}
             </button>
             {#if shareSearchQuery || shareLetterFilter || shareFilterMode !== 'all'}
               <button
@@ -796,7 +797,7 @@
                 onclick={resetShareFilters}
               >
                 <Icon icon="mdi:filter-off" class="w-4 h-4" />
-                Clear
+                {$t("band.clear")}
               </button>
             {/if}
           </div>
@@ -807,13 +808,13 @@
           {#if sharePickerSongs.length === 0}
             <div class="flex flex-col items-center justify-center h-full text-white/40">
               <Icon icon="mdi:music-note-off" class="w-16 h-16 mb-4 opacity-50" />
-              <p class="text-lg font-medium mb-1">No songs found</p>
-              <p class="text-sm text-white/30 mb-4">Try adjusting your filters</p>
+              <p class="text-lg font-medium mb-1">{$t("share.noSongsFound")}</p>
+              <p class="text-sm text-white/30 mb-4">{$t("share.tryAdjusting")}</p>
               <button
                 class="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-sm text-white transition-colors"
                 onclick={resetShareFilters}
               >
-                Clear All Filters
+                {$t("share.clearFilters")}
               </button>
             </div>
           {:else}
@@ -891,7 +892,7 @@
         <div class="mt-4 p-3 rounded-lg bg-white/5 flex items-start gap-2">
           <Icon icon="mdi:shield-check" class="w-4 h-4 text-[#1db954] flex-shrink-0 mt-0.5" />
           <p class="text-xs text-white/50">
-            File will be verified as a valid MIDI before saving to your library.
+            {$t("share.securityNote")}
           </p>
         </div>
       </div>
@@ -902,14 +903,14 @@
           class="flex-1 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-medium text-sm transition-colors"
           onclick={() => { showDownloadModal = false; downloadingSong = null; }}
         >
-          Cancel
+          {$t("share.cancel")}
         </button>
         <button
           class="flex-1 py-2.5 rounded-xl bg-[#1db954] hover:bg-[#1ed760] text-white font-medium text-sm transition-colors flex items-center justify-center gap-2"
           onclick={confirmDownload}
         >
           <Icon icon="mdi:download" class="w-4 h-4" />
-          Download
+          {$t("share.download")}
         </button>
       </div>
     </div>

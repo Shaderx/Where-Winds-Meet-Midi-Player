@@ -291,6 +291,12 @@ fn get_data_path(filename: &str) -> Result<std::path::PathBuf, String> {
     Ok(exe_dir.join(filename))
 }
 
+fn get_locales_folder() -> Result<std::path::PathBuf, String> {
+    let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
+    let exe_dir = exe_path.parent().ok_or("Failed to get executable directory")?;
+    Ok(exe_dir.join("locales"))
+}
+
 fn get_album_folder() -> Result<std::path::PathBuf, String> {
     // Check if custom path is set - return it even if it doesn't exist yet
     // (the caller will create it if needed)
@@ -1357,6 +1363,124 @@ async fn reset_album_path() -> Result<String, String> {
     let exe_dir = exe_path.parent().ok_or("Failed to get executable directory")?;
     Ok(exe_dir.join("album").to_string_lossy().to_string())
 }
+
+// ============ LOCALE MANAGEMENT ============
+
+#[tauri::command]
+async fn get_locales_path() -> Result<String, String> {
+    let path = get_locales_folder()?;
+    Ok(path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+async fn get_user_locale(lang: String) -> Result<Option<serde_json::Value>, String> {
+    let locales_dir = get_locales_folder()?;
+    let locale_file = locales_dir.join(format!("{}.json", lang));
+
+    if !locale_file.exists() {
+        return Ok(None);
+    }
+
+    let content = std::fs::read_to_string(&locale_file)
+        .map_err(|e| format!("Failed to read locale file: {}", e))?;
+
+    let json: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse locale JSON: {}", e))?;
+
+    Ok(Some(json))
+}
+
+#[tauri::command]
+async fn save_user_locale(lang: String, data: serde_json::Value) -> Result<(), String> {
+    let locales_dir = get_locales_folder()?;
+
+    // Create locales directory if it doesn't exist
+    if !locales_dir.exists() {
+        std::fs::create_dir_all(&locales_dir)
+            .map_err(|e| format!("Failed to create locales directory: {}", e))?;
+    }
+
+    let locale_file = locales_dir.join(format!("{}.json", lang));
+    let content = serde_json::to_string_pretty(&data)
+        .map_err(|e| format!("Failed to serialize locale: {}", e))?;
+
+    std::fs::write(&locale_file, content)
+        .map_err(|e| format!("Failed to write locale file: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_available_user_locales() -> Result<Vec<String>, String> {
+    let locales_dir = get_locales_folder()?;
+
+    if !locales_dir.exists() {
+        return Ok(vec![]);
+    }
+
+    let mut locales = Vec::new();
+    let entries = std::fs::read_dir(&locales_dir)
+        .map_err(|e| format!("Failed to read locales directory: {}", e))?;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().map(|e| e == "json").unwrap_or(false) {
+            if let Some(stem) = path.file_stem() {
+                locales.push(stem.to_string_lossy().to_string());
+            }
+        }
+    }
+
+    Ok(locales)
+}
+
+#[tauri::command]
+async fn init_user_locales(default_locales: std::collections::HashMap<String, serde_json::Value>) -> Result<(), String> {
+    let locales_dir = get_locales_folder()?;
+
+    // Create locales directory if it doesn't exist
+    if !locales_dir.exists() {
+        std::fs::create_dir_all(&locales_dir)
+            .map_err(|e| format!("Failed to create locales directory: {}", e))?;
+    }
+
+    // For each default locale, create file if it doesn't exist
+    for (lang, data) in default_locales {
+        let locale_file = locales_dir.join(format!("{}.json", lang));
+        if !locale_file.exists() {
+            let content = serde_json::to_string_pretty(&data)
+                .map_err(|e| format!("Failed to serialize locale: {}", e))?;
+            std::fs::write(&locale_file, content)
+                .map_err(|e| format!("Failed to write locale file: {}", e))?;
+            app_log!("Created user locale file: {}.json", lang);
+        }
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn open_locales_folder() -> Result<(), String> {
+    let locales_dir = get_locales_folder()?;
+
+    // Create if doesn't exist
+    if !locales_dir.exists() {
+        std::fs::create_dir_all(&locales_dir)
+            .map_err(|e| format!("Failed to create locales directory: {}", e))?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(&locales_dir)
+            .spawn()
+            .map_err(|e| format!("Failed to open folder: {}", e))?;
+    }
+
+    Ok(())
+}
+
+// ============ END LOCALE MANAGEMENT ============
 
 // Band mode: Read MIDI file as base64 for transfer
 #[tauri::command]
@@ -3070,6 +3194,12 @@ fn main() {
             get_album_path,
             set_album_path,
             reset_album_path,
+            get_locales_path,
+            get_user_locale,
+            save_user_locale,
+            get_available_user_locales,
+            init_user_locales,
+            open_locales_folder,
             read_midi_base64,
             check_midi_exists,
             check_file_exists,

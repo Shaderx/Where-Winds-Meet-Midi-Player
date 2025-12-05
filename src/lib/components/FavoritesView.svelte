@@ -6,6 +6,7 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { save, open } from "@tauri-apps/plugin-dialog";
+  import { t } from "svelte-i18n";
   import {
     favorites,
     midiFiles,
@@ -33,12 +34,12 @@
   let searchQuery = "";
   let sortBy = "manual";
 
-  const sortOptions = [
-    { id: "manual", label: "Manual", icon: "mdi:drag" },
-    { id: "name-asc", label: "A-Z", icon: "mdi:sort-alphabetical-ascending" },
-    { id: "name-desc", label: "Z-A", icon: "mdi:sort-alphabetical-descending" },
-    { id: "duration-asc", label: "Shortest", icon: "mdi:sort-numeric-ascending" },
-    { id: "duration-desc", label: "Longest", icon: "mdi:sort-numeric-descending" },
+  $: sortOptions = [
+    { id: "manual", label: $t("sort.manual"), icon: "mdi:drag" },
+    { id: "name-asc", label: $t("sort.nameAsc"), icon: "mdi:sort-alphabetical-ascending" },
+    { id: "name-desc", label: $t("sort.nameDesc"), icon: "mdi:sort-alphabetical-descending" },
+    { id: "duration-asc", label: $t("sort.durationAsc"), icon: "mdi:sort-numeric-ascending" },
+    { id: "duration-desc", label: $t("sort.durationDesc"), icon: "mdi:sort-numeric-descending" },
   ];
 
   function showToast(message, type = "success") {
@@ -257,8 +258,8 @@
         <Icon icon="mdi:heart" class="w-8 h-8 text-[#1db954]" />
       </div>
       <div>
-        <h2 class="text-2xl font-bold">Favorites</h2>
-        <p class="text-sm text-white/60">{$favorites.length} liked songs</p>
+        <h2 class="text-2xl font-bold">{$t("favorites.title")}</h2>
+        <p class="text-sm text-white/60">{$favorites.length} {$t("library.songs")}</p>
       </div>
     </div>
 
@@ -269,35 +270,35 @@
           onclick={playAllFavorites}
         >
           <Icon icon="mdi:play" class="w-5 h-5" />
-          Play All
+          {$t("library.playAll")}
         </button>
         <button
           class="px-3 py-2 rounded-full bg-white/10 hover:bg-white/20 text-white/60 hover:text-white text-sm font-medium transition-all flex items-center gap-1.5"
           onclick={exportFavorites}
           disabled={isExporting}
-          title="Export favorites with MIDI files"
+          title={$t("playlists.export")}
         >
           <Icon icon={isExporting ? "mdi:loading" : "mdi:export"} class="w-4 h-4 {isExporting ? 'animate-spin' : ''}" />
-          Export
+          {$t("playlists.export")}
         </button>
       {/if}
       <button
         class="px-3 py-2 rounded-full bg-white/10 hover:bg-white/20 text-white/60 hover:text-white text-sm font-medium transition-all flex items-center gap-1.5"
         onclick={importFavorites}
         disabled={isImporting}
-        title="Import favorites from zip"
+        title={$t("playlists.import")}
       >
         <Icon icon={isImporting ? "mdi:loading" : "mdi:import"} class="w-4 h-4 {isImporting ? 'animate-spin' : ''}" />
-        Import
+        {$t("playlists.import")}
       </button>
       {#if $favorites.length > 0}
         <button
           class="px-3 py-2 rounded-full bg-white/10 hover:bg-red-500/20 text-white/60 hover:text-red-400 text-sm font-medium transition-all flex items-center gap-1.5"
           onclick={() => showClearModal = true}
-          title="Clear all favorites"
+          title={$t("favorites.clearAll")}
         >
           <Icon icon="mdi:delete-sweep" class="w-4 h-4" />
-          Clear All
+          {$t("favorites.clearAll")}
         </button>
       {/if}
     </div>
@@ -309,7 +310,7 @@
       <SearchSort
         bind:searchQuery
         bind:sortBy
-        placeholder="Search favorites..."
+        placeholder={$t("favorites.title") + "..."}
         {sortOptions}
       />
     </div>
@@ -404,10 +405,10 @@
             </p>
             <p class="text-xs text-white/40">
               {#if isMissing}
-                <span class="text-red-400">File missing</span> •
-                <button class="text-red-400 hover:text-red-300 underline" onclick={() => handleRemoveMissing(item)}>Remove</button>
+                <span class="text-red-400">{$t("favorites.fileMissing")}</span> •
+                <button class="text-red-400 hover:text-red-300 underline" onclick={() => handleRemoveMissing(item)}>{$t("playlists.remove")}</button>
               {:else}
-                {item.bpm || 120} BPM • {#if (item.note_density || 0) < 3}Easy{:else if (item.note_density || 0) < 6}Medium{:else if (item.note_density || 0) < 10}Hard{:else}Expert{/if}
+                {item.bpm || 120} BPM • {#if (item.note_density || 0) < 3}{$t("library.easy")}{:else if (item.note_density || 0) < 6}{$t("library.medium")}{:else if (item.note_density || 0) < 10}{$t("library.hard")}{:else}{$t("library.expert")}{/if}
               {/if}
             </p>
           </div>
@@ -427,7 +428,7 @@
                 e.stopPropagation();
                 addToQueue(item);
               }}
-              title="Add to queue"
+              title={$t("library.addToQueue")}
             >
               <Icon icon="mdi:playlist-plus" class="w-5 h-5" />
             </button>
@@ -438,7 +439,7 @@
                 e.stopPropagation();
                 toggleFavorite(item);
               }}
-              title="Remove from favorites"
+              title={$t("library.removeFromFavorites")}
             >
               <Icon icon="mdi:heart" class="w-5 h-5" />
             </button>
@@ -452,13 +453,13 @@
         class="pt-4 mt-4 border-t border-white/10 flex items-center justify-center gap-2 text-white/30"
       >
         <Icon icon="mdi:gesture-swipe-vertical" class="w-4 h-4" />
-        <p class="text-xs">Drag to reorder</p>
+        <p class="text-xs">{$t("playlists.dragToReorder")}</p>
       </div>
     {/if}
   {:else if $favorites.length > 0 && searchQuery}
     <div class="flex-1 flex flex-col items-center justify-center text-white/40 py-16">
       <Icon icon="mdi:magnify" class="w-10 h-10 opacity-50 mb-4" />
-      <p class="text-sm">No results for "{searchQuery}"</p>
+      <p class="text-sm">{$t("common.noResults", { values: { query: searchQuery } })}</p>
     </div>
   {/if}
 
@@ -472,9 +473,9 @@
       >
         <Icon icon="mdi:heart-outline" class="w-10 h-10 opacity-50" />
       </div>
-      <p class="text-lg font-semibold mb-2 text-white/60">No favorites yet</p>
+      <p class="text-lg font-semibold mb-2 text-white/60">{$t("favorites.noFavorites")}</p>
       <p class="text-sm text-center">
-        Click the heart icon on songs<br />to add them to favorites
+        {$t("favorites.clickHeart")}
       </p>
     </div>
   {/if}
@@ -499,9 +500,9 @@
         <div class="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-3">
           <Icon icon="mdi:heart-off" class="w-6 h-6 text-red-400" />
         </div>
-        <h3 class="text-lg font-bold mb-2">Clear All Favorites?</h3>
-        <p class="text-sm text-white/60 mb-1">This will remove all {$favorites.length} songs from your favorites.</p>
-        <p class="text-xs text-white/40">This cannot be undone.</p>
+        <h3 class="text-lg font-bold mb-2">{$t("favorites.clearAllTitle")}</h3>
+        <p class="text-sm text-white/60 mb-1">{$t("favorites.clearAllDesc", { values: { count: $favorites.length } })}</p>
+        <p class="text-xs text-white/40">{$t("playlists.cannotBeUndone")}</p>
       </div>
 
       <div class="flex gap-2 p-4 pt-0">
@@ -509,13 +510,13 @@
           class="flex-1 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white font-medium text-sm transition-colors"
           onclick={() => showClearModal = false}
         >
-          Cancel
+          {$t("common.cancel")}
         </button>
         <button
           class="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-medium text-sm transition-colors"
           onclick={() => { clearAllFavorites(); showClearModal = false; }}
         >
-          Clear All
+          {$t("favorites.clearAll")}
         </button>
       </div>
     </div>

@@ -6,6 +6,7 @@
   import { dndzone } from "svelte-dnd-action";
   import { invoke } from "@tauri-apps/api/core";
   import { save, open } from "@tauri-apps/plugin-dialog";
+  import { t } from "svelte-i18n";
   import {
     savedPlaylists,
     midiFiles,
@@ -34,12 +35,12 @@
   let searchQuery = "";
   let sortBy = "manual";
 
-  const sortOptions = [
-    { id: "manual", label: "Manual", icon: "mdi:drag" },
-    { id: "name-asc", label: "A-Z", icon: "mdi:sort-alphabetical-ascending" },
-    { id: "name-desc", label: "Z-A", icon: "mdi:sort-alphabetical-descending" },
-    { id: "duration-asc", label: "Shortest", icon: "mdi:sort-numeric-ascending" },
-    { id: "duration-desc", label: "Longest", icon: "mdi:sort-numeric-descending" },
+  $: sortOptions = [
+    { id: "manual", label: $t("sort.manual"), icon: "mdi:drag" },
+    { id: "name-asc", label: $t("sort.nameAsc"), icon: "mdi:sort-alphabetical-ascending" },
+    { id: "name-desc", label: $t("sort.nameDesc"), icon: "mdi:sort-alphabetical-descending" },
+    { id: "duration-asc", label: $t("sort.durationAsc"), icon: "mdi:sort-numeric-ascending" },
+    { id: "duration-desc", label: $t("sort.durationDesc"), icon: "mdi:sort-numeric-descending" },
   ];
 
   // Context menu
@@ -305,7 +306,7 @@
         <button
           class="p-1 -ml-1 text-white/60 hover:text-white transition-colors"
           onclick={goBack}
-          title="Back to Playlists"
+          title={$t("playlists.backToPlaylists")}
         >
           <Icon icon="mdi:arrow-left" class="w-5 h-5" />
         </button>
@@ -330,13 +331,13 @@
             <h2
               class="text-lg font-bold truncate cursor-pointer hover:text-[#1db954] transition-colors"
               onclick={() => startEditing(selectedPlaylist)}
-              title="Click to rename"
+              title={$t("playlists.clickToRename")}
             >
               {selectedPlaylist.name}
             </h2>
           {/if}
           <p class="text-xs text-white/50">
-            {selectedPlaylist.tracks.length} songs
+            {selectedPlaylist.tracks.length} {$t("library.songs")}
           </p>
         </div>
 
@@ -347,20 +348,20 @@
             disabled={selectedPlaylist.tracks.length === 0}
           >
             <Icon icon="mdi:play" class="w-4 h-4" />
-            Play
+            {$t("playlists.play")}
           </button>
           <button
             class="p-2 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-all"
             onclick={exportPlaylist}
             disabled={selectedPlaylist.tracks.length === 0 || isExporting}
-            title="Export playlist"
+            title={$t("playlists.exportPlaylist")}
           >
             <Icon icon={isExporting ? "mdi:loading" : "mdi:export"} class="w-4 h-4 {isExporting ? 'animate-spin' : ''}" />
           </button>
           <button
             class="p-2 rounded-full hover:bg-red-500/20 text-white/60 hover:text-red-400 transition-all"
             onclick={() => handleDelete(selectedPlaylist.id)}
-            title="Delete playlist"
+            title={$t("playlists.deletePlaylist")}
           >
             <Icon icon="mdi:delete-outline" class="w-4 h-4" />
           </button>
@@ -374,7 +375,7 @@
         <SearchSort
           bind:searchQuery
           bind:sortBy
-          placeholder="Search tracks..."
+          placeholder={$t("playlists.searchTracks")}
           {sortOptions}
         />
       </div>
@@ -413,7 +414,7 @@
           <!-- Track Number / Play Button / Playing Indicator / Missing Icon -->
           <div class="w-8 flex items-center justify-center flex-shrink-0">
             {#if isMissing}
-              <Icon icon="mdi:file-alert" class="w-5 h-5 text-red-400" title="File missing" />
+              <Icon icon="mdi:file-alert" class="w-5 h-5 text-red-400" title={$t("playlists.fileMissing")} />
             {:else if isPlayingTrack}
               <div class="flex items-end gap-0.5 h-4">
                 <div class="w-0.5 bg-[#1db954] rounded-full" style="height: 60%; animation: music-bar-1 0.6s ease-in-out infinite;"></div>
@@ -442,10 +443,10 @@
             </p>
             <p class="text-xs text-white/40">
               {#if isMissing}
-                <span class="text-red-400">File missing</span> •
-                <button class="text-red-400 hover:text-red-300 underline" onclick={() => handleRemoveTrack(track.hash)}>Remove</button>
+                <span class="text-red-400">{$t("playlists.fileMissing")}</span> •
+                <button class="text-red-400 hover:text-red-300 underline" onclick={() => handleRemoveTrack(track.hash)}>{$t("playlists.remove")}</button>
               {:else}
-                {track.bpm || 120} BPM • {#if (track.note_density || 0) < 3}Easy{:else if (track.note_density || 0) < 6}Medium{:else if (track.note_density || 0) < 10}Hard{:else}Expert{/if}
+                {track.bpm || 120} BPM • {#if (track.note_density || 0) < 3}{$t("library.easy")}{:else if (track.note_density || 0) < 6}{$t("library.medium")}{:else if (track.note_density || 0) < 10}{$t("library.hard")}{:else}{$t("library.expert")}{/if}
               {/if}
             </p>
           </div>
@@ -464,7 +465,7 @@
               e.stopPropagation();
               handleRemoveTrack(track.hash);
             }}
-            title="Remove from playlist"
+            title={$t("playlists.removeFromPlaylist")}
           >
             <Icon icon="mdi:close" class="w-4 h-4" />
           </button>
@@ -475,7 +476,7 @@
     {#if trackItems.length === 0 && selectedPlaylist.tracks.length > 0 && searchQuery}
       <div class="flex-1 flex flex-col items-center justify-center text-white/40 py-12">
         <Icon icon="mdi:magnify" class="w-10 h-10 opacity-50 mb-4" />
-        <p class="text-sm">No results for "{searchQuery}"</p>
+        <p class="text-sm">{$t("common.noResults", { values: { query: searchQuery } })}</p>
       </div>
     {:else if selectedPlaylist.tracks.length === 0}
       <div class="flex-1 flex flex-col items-center justify-center text-white/40 py-12">
@@ -483,8 +484,8 @@
           icon="mdi:music-note-plus"
           class="w-12 h-12 mb-4 opacity-50"
         />
-        <p class="text-sm">This playlist is empty</p>
-        <p class="text-xs mt-1">Add songs from your library</p>
+        <p class="text-sm">{$t("playlists.emptyPlaylist")}</p>
+        <p class="text-xs mt-1">{$t("playlists.addSongsFromLibrary")}</p>
       </div>
     {/if}
 
@@ -493,7 +494,7 @@
         class="pt-4 mt-4 border-t border-white/10 flex items-center justify-center gap-2 text-white/30"
       >
         <Icon icon="mdi:gesture-swipe-vertical" class="w-4 h-4" />
-        <p class="text-xs">Drag to reorder</p>
+        <p class="text-xs">{$t("playlists.dragToReorder")}</p>
       </div>
     {/if}
   {:else}
@@ -501,9 +502,9 @@
     <div class="mb-6">
       <div class="flex items-center justify-between mb-4">
         <div>
-          <h2 class="text-2xl font-bold">Playlists</h2>
+          <h2 class="text-2xl font-bold">{$t("playlists.title")}</h2>
           <p class="text-sm text-white/60">
-            {$savedPlaylists.length} playlists
+            {$savedPlaylists.length} {$t("playlists.title").toLowerCase()}
           </p>
         </div>
         <div class="flex items-center gap-2">
@@ -511,17 +512,17 @@
             class="spotify-button spotify-button--secondary flex items-center gap-2"
             onclick={importPlaylist}
             disabled={isImporting}
-            title="Import playlist from zip"
+            title={$t("playlists.import")}
           >
             <Icon icon={isImporting ? "mdi:loading" : "mdi:import"} class="w-4 h-4 {isImporting ? 'animate-spin' : ''}" />
-            Import
+            {$t("playlists.import")}
           </button>
           <button
             class="spotify-button spotify-button--secondary flex items-center gap-2"
             onclick={() => (showCreateModal = true)}
           >
             <Icon icon="mdi:plus" class="w-4 h-4" />
-            New
+            {$t("playlists.new")}
           </button>
         </div>
       </div>
@@ -580,7 +581,7 @@
                   </p>
                 {/if}
                 <p class="text-xs text-white/50">
-                  {playlist.tracks.length} songs
+                  {playlist.tracks.length} {$t("library.songs")}
                 </p>
               </div>
 
@@ -594,7 +595,7 @@
                     e.stopPropagation();
                     handleLoadToQueue(playlist);
                   }}
-                  title="Play playlist"
+                  title={$t("playlists.play")}
                 >
                   <Icon icon="mdi:play" class="w-5 h-5" />
                 </button>
@@ -605,7 +606,7 @@
                     exportPlaylist(playlist);
                   }}
                   disabled={playlist.tracks.length === 0 || isExporting}
-                  title="Export playlist"
+                  title={$t("playlists.exportPlaylist")}
                 >
                   <Icon icon={isExporting ? "mdi:loading" : "mdi:export"} class="w-4 h-4 {isExporting ? 'animate-spin' : ''}" />
                 </button>
@@ -615,7 +616,7 @@
                     e.stopPropagation();
                     startEditing(playlist);
                   }}
-                  title="Rename"
+                  title={$t("playlists.rename")}
                 >
                   <Icon icon="mdi:pencil" class="w-4 h-4" />
                 </button>
@@ -625,7 +626,7 @@
                     e.stopPropagation();
                     handleDelete(playlist.id);
                   }}
-                  title="Delete"
+                  title={$t("playlists.delete")}
                 >
                   <Icon icon="mdi:delete-outline" class="w-4 h-4" />
                 </button>
@@ -639,7 +640,7 @@
         class="pt-4 mt-4 border-t border-white/10 flex items-center justify-center gap-2 text-white/30"
       >
         <Icon icon="mdi:gesture-swipe-vertical" class="w-4 h-4" />
-        <p class="text-xs">Drag to reorder</p>
+        <p class="text-xs">{$t("playlists.dragToReorder")}</p>
       </div>
     {:else}
       <div
@@ -651,14 +652,14 @@
         >
           <Icon icon="mdi:playlist-plus" class="w-10 h-10 opacity-50" />
         </div>
-        <p class="text-lg font-semibold mb-2 text-white/60">No playlists yet</p>
-        <p class="text-sm mb-4">Create a playlist to organize your music</p>
+        <p class="text-lg font-semibold mb-2 text-white/60">{$t("playlists.noPlaylists")}</p>
+        <p class="text-sm mb-4">{$t("playlists.createToOrganize")}</p>
         <button
           class="spotify-button spotify-button--primary flex items-center gap-2"
           onclick={() => (showCreateModal = true)}
         >
           <Icon icon="mdi:plus" class="w-4 h-4" />
-          Create Playlist
+          {$t("playlists.createPlaylist")}
         </button>
       </div>
     {/if}
@@ -684,7 +685,7 @@
     >
       <!-- Header -->
       <div class="flex items-center justify-between p-4 border-b border-white/10">
-        <h3 class="text-lg font-bold">Create Playlist</h3>
+        <h3 class="text-lg font-bold">{$t("playlists.createPlaylist")}</h3>
         <button
           class="p-1 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-colors"
           onclick={() => { showCreateModal = false; newPlaylistName = ""; }}
@@ -697,10 +698,10 @@
       <div class="p-4 space-y-4">
         <!-- Name Input -->
         <div>
-          <label class="block text-sm font-medium text-white/70 mb-2">Playlist Name</label>
+          <label class="block text-sm font-medium text-white/70 mb-2">{$t("playlists.playlistName")}</label>
           <input
             type="text"
-            placeholder="My playlist"
+            placeholder={$t("playlists.myPlaylist")}
             bind:value={newPlaylistName}
             class="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-[#1db954] focus:border-transparent transition-all"
             onkeydown={(e) => e.key === "Enter" && handleCreate()}
@@ -714,14 +715,14 @@
             class="px-4 py-2.5 rounded-lg bg-white/10 hover:bg-white/15 text-white font-medium text-sm transition-colors"
             onclick={() => { showCreateModal = false; newPlaylistName = ""; }}
           >
-            Cancel
+            {$t("common.cancel")}
           </button>
           <button
             class="px-4 py-2.5 rounded-lg bg-[#1db954] hover:bg-[#1ed760] text-black font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             onclick={handleCreate}
             disabled={!newPlaylistName.trim()}
           >
-            Create
+            {$t("common.create")}
           </button>
         </div>
       </div>
@@ -748,7 +749,7 @@
     >
       <!-- Header -->
       <div class="flex items-center justify-between p-4 border-b border-white/10">
-        <h3 class="text-lg font-bold">Delete Playlist</h3>
+        <h3 class="text-lg font-bold">{$t("playlists.deletePlaylist")}</h3>
         <button
           class="p-1 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-colors"
           onclick={cancelDelete}
@@ -766,7 +767,7 @@
           </div>
           <div class="text-left">
             <p class="font-semibold text-white">{$savedPlaylists.find(p => p.id === deleteConfirmId)?.name || 'Playlist'}</p>
-            <p class="text-sm text-white/50">This action cannot be undone</p>
+            <p class="text-sm text-white/50">{$t("playlists.cannotBeUndone")}</p>
           </div>
         </div>
 
@@ -776,13 +777,13 @@
             class="px-4 py-2.5 rounded-lg bg-white/10 hover:bg-white/15 text-white font-medium text-sm transition-colors"
             onclick={cancelDelete}
           >
-            Cancel
+            {$t("common.cancel")}
           </button>
           <button
             class="px-4 py-2.5 rounded-lg bg-red-500 hover:bg-red-600 text-white font-medium text-sm transition-colors"
             onclick={confirmDelete}
           >
-            Delete
+            {$t("common.delete")}
           </button>
         </div>
       </div>

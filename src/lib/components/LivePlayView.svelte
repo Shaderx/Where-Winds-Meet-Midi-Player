@@ -3,6 +3,7 @@
   import { fade, fly } from "svelte/transition";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import { t } from "svelte-i18n";
   import {
     midiInputDevices,
     selectedMidiDevice,
@@ -40,14 +41,14 @@
     low: ["Z", "X", "C", "V", "B", "N", "M"]
   };
 
-  // Connection state styling
-  const stateConfig = {
-    NoDevices: { color: "text-zinc-400", bgColor: "bg-zinc-500/10", icon: "mdi:midi-port", message: "No MIDI devices found" },
-    DevicesAvailable: { color: "text-yellow-400", bgColor: "bg-yellow-500/10", icon: "mdi:midi", message: "Select a device" },
-    Connecting: { color: "text-yellow-400", bgColor: "bg-yellow-500/10", icon: "mdi:loading", message: "Connecting..." },
-    Connected: { color: "text-[#1db954]", bgColor: "bg-[#1db954]/10", icon: "mdi:check-circle", message: "Connected" },
-    Disconnected: { color: "text-red-400", bgColor: "bg-red-500/10", icon: "mdi:close-circle", message: "Disconnected" },
-    Error: { color: "text-red-400", bgColor: "bg-red-500/10", icon: "mdi:alert-circle", message: "Connection error" },
+  // Connection state styling (reactive for i18n)
+  $: stateConfig = {
+    NoDevices: { color: "text-zinc-400", bgColor: "bg-zinc-500/10", icon: "mdi:midi-port", message: $t("livePlay.noDevicesFound") },
+    DevicesAvailable: { color: "text-yellow-400", bgColor: "bg-yellow-500/10", icon: "mdi:midi", message: $t("livePlay.selectDevice") },
+    Connecting: { color: "text-yellow-400", bgColor: "bg-yellow-500/10", icon: "mdi:loading", message: $t("livePlay.connecting") },
+    Connected: { color: "text-[#1db954]", bgColor: "bg-[#1db954]/10", icon: "mdi:check-circle", message: $t("livePlay.connected") },
+    Disconnected: { color: "text-red-400", bgColor: "bg-red-500/10", icon: "mdi:close-circle", message: $t("livePlay.disconnected") },
+    Error: { color: "text-red-400", bgColor: "bg-red-500/10", icon: "mdi:alert-circle", message: $t("livePlay.connectionError") },
   };
 
   $: currentState = stateConfig[$midiConnectionState] || stateConfig.NoDevices;
@@ -210,15 +211,15 @@
 >
   <!-- Header -->
   <div class="mb-2">
-    <h2 class="text-2xl font-bold">Live Play</h2>
-    <p class="text-sm text-white/60">Connect your MIDI device and play in real-time</p>
+    <h2 class="text-2xl font-bold">{$t("livePlay.title")}</h2>
+    <p class="text-sm text-white/60">{$t("livePlay.subtitle")}</p>
   </div>
 
   <!-- Device Selection -->
   <div class="bg-white/5 rounded-lg p-4 space-y-3">
     <div class="flex items-center gap-2 text-white/70 text-sm font-medium">
       <Icon icon="mdi:usb" class="w-4 h-4" />
-      <span>MIDI Device</span>
+      <span>{$t("livePlay.midiDevice")}</span>
     </div>
 
     <!-- Device Dropdown -->
@@ -232,7 +233,7 @@
           <div class="flex items-center gap-2 min-w-0">
             <Icon icon={isVirtualDeviceSelected ? 'mdi:piano' : 'mdi:midi'} class="w-4 h-4 {isVirtualDeviceSelected ? 'text-orange-400' : 'text-white/50'} flex-shrink-0" />
             <span class="truncate {selectedDeviceName ? (isVirtualDeviceSelected ? 'text-orange-400' : 'text-white') : 'text-white/50'}">
-              {selectedDeviceName || 'Select a device...'}
+              {selectedDeviceName || $t("livePlay.selectDevice") + '...'}
             </span>
           </div>
           <Icon icon="mdi:chevron-down" class="w-4 h-4 text-white/50 flex-shrink-0" />
@@ -247,7 +248,7 @@
           >
             {#if deviceList.length === 0}
               <div class="px-3 py-3 text-sm text-white/40 text-center">
-                No MIDI devices found
+                {$t("livePlay.noDevicesFound")}
               </div>
             {:else}
               {#each deviceList as device, index}
@@ -271,7 +272,7 @@
         class="p-2.5 bg-white/5 hover:bg-white/10 rounded-lg transition-colors {isListening ? 'opacity-50 cursor-not-allowed' : ''}"
         onclick={handleRefresh}
         disabled={isListening}
-        title="Refresh devices"
+        title={$t("livePlay.refreshDevices")}
       >
         <Icon icon="mdi:refresh" class="w-5 h-5" />
       </button>
@@ -293,7 +294,7 @@
         onclick={handleDisconnectWithVirtual}
       >
         <Icon icon="mdi:stop" class="w-5 h-5" />
-        <span>Stop Listening</span>
+        <span>{$t("livePlay.stopListening")}</span>
       </button>
     {:else}
       <button
@@ -302,7 +303,7 @@
         disabled={$selectedMidiDeviceIndex === null || isConnecting}
       >
         <Icon icon="mdi:play" class="w-5 h-5" />
-        <span>{isConnecting ? 'Connecting...' : 'Start Listening'}</span>
+        <span>{isConnecting ? $t("livePlay.connecting") : $t("livePlay.startListening")}</span>
       </button>
     {/if}
   </div>
@@ -312,7 +313,7 @@
     <div class="bg-white/5 rounded-lg p-4 space-y-3" in:fly={{ y: 10, duration: 200 }}>
       <div class="flex items-center gap-2 text-white/70 text-sm font-medium">
         <Icon icon="mdi:music-note" class="w-4 h-4" />
-        <span>Live Input</span>
+        <span>{$t("livePlay.liveInput")}</span>
       </div>
 
       <!-- Last Note Display -->
@@ -321,10 +322,10 @@
           <div class="flex items-center gap-3 text-lg" in:fade={{ duration: 100 }}>
             <span class="text-[#1db954] font-bold text-2xl">{$lastLiveNote.noteName}</span>
             <Icon icon="mdi:arrow-right" class="w-5 h-5 text-white/50" />
-            <span class="text-white font-medium">Key: {$lastLiveNote.key.toUpperCase()}</span>
+            <span class="text-white font-medium">{$t("livePlay.key")} {$lastLiveNote.key.toUpperCase()}</span>
           </div>
         {:else}
-          <span class="text-white/40 italic">{$isDevVirtualConnected ? 'Waiting for input...' : 'Play a note on your MIDI device...'}</span>
+          <span class="text-white/40 italic">{$isDevVirtualConnected ? $t("livePlay.waitingForInput") : $t("livePlay.playNoteOnDevice")}</span>
         {/if}
       </div>
 
@@ -351,8 +352,8 @@
   <div class="flex gap-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-400 text-xs">
     <Icon icon="mdi:information-outline" class="w-5 h-5 flex-shrink-0" />
     <div class="space-y-1">
-      <p>Connect a MIDI keyboard or controller via USB. Most devices work automatically without drivers.</p>
-      <p>Notes you play will be translated to game keys using the selected note mode.</p>
+      <p>{$t("livePlay.info1")}</p>
+      <p>{$t("livePlay.info2")}</p>
     </div>
   </div>
 
@@ -362,9 +363,9 @@
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2 text-orange-400 text-sm font-medium">
           <Icon icon="mdi:piano" class="w-5 h-5" />
-          <span>Virtual MIDI Keyboard</span>
+          <span>{$t("livePlay.virtualKeyboard")}</span>
         </div>
-        <span class="text-[10px] text-orange-400/50 bg-orange-500/20 px-2 py-0.5 rounded">DEV ONLY</span>
+        <span class="text-[10px] text-orange-400/50 bg-orange-500/20 px-2 py-0.5 rounded">{$t("livePlay.devOnly")}</span>
       </div>
 
       <!-- Piano Keyboard (direct key mapping like test_all_keys_36) -->
@@ -417,9 +418,9 @@
           onclick={simulateRandomNote}
         >
           <Icon icon="mdi:dice-5" class="w-4 h-4 inline mr-1" />
-          Random Note
+          {$t("livePlay.randomNote")}
         </button>
-        <span class="text-[10px] text-orange-400/40">Click keys or use buttons to simulate MIDI input</span>
+        <span class="text-[10px] text-orange-400/40">{$t("livePlay.clickKeysToSimulate")}</span>
       </div>
     </div>
   {/if}

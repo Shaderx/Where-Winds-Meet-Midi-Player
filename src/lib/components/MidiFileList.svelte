@@ -5,6 +5,7 @@
   import { listen } from "@tauri-apps/api/event";
   import { invoke } from "@tauri-apps/api/core";
   import { open, save } from "@tauri-apps/plugin-dialog";
+  import { t } from "svelte-i18n";
   import {
     midiFiles,
     currentFile,
@@ -309,7 +310,7 @@
     if (lastImportedFiles.length > 0 && newPlaylistName.trim()) {
       const id = createPlaylist(newPlaylistName.trim());
       addManyToSavedPlaylist(id, lastImportedFiles);
-      showToast(`Created playlist "${newPlaylistName.trim()}"`, "success");
+      showToast($t("library.createdPlaylist", { values: { name: newPlaylistName.trim() } }), "success");
     }
     showPlaylistPrompt = false;
     lastImportedFiles = [];
@@ -372,7 +373,7 @@
 
         const count = await invoke("export_library", { exportPath });
         unlisten();
-        showToast(`Exported ${count.toLocaleString()} songs`, "success");
+        showToast($t("library.addedSongsToQueue", { values: { count: count.toLocaleString() } }) + " (exported)", "success");
       }
     } catch (error) {
       console.error("Failed to export library:", error);
@@ -416,7 +417,7 @@
       }
       return list;
     });
-    showToast(added ? "Added to queue" : "Already in queue", added ? "success" : "info");
+    showToast(added ? $t("library.addedToQueue") : $t("library.alreadyInQueue"), added ? "success" : "info");
   }
 
   function handleAddToPlaylist(playlistId, file) {
@@ -425,7 +426,7 @@
     addToSavedPlaylist(playlistId, file);
     showPlaylistMenu = null;
     showToast(
-      alreadyExists ? `Already in "${pl?.name}"` : `Added to "${pl?.name}"`,
+      alreadyExists ? $t("library.alreadyInQueue") : $t("library.addedSongsToPlaylist", { values: { count: 1, name: pl?.name } }),
       alreadyExists ? "info" : "success"
     );
   }
@@ -434,7 +435,7 @@
     const wasFavorite = $favorites.some((f) => f.hash === file.hash);
     toggleFavorite(file);
     showToast(
-      wasFavorite ? "Removed from favorites" : "Added to favorites",
+      wasFavorite ? $t("library.removedFromFavorites") : $t("library.addedToFavorites"),
       wasFavorite ? "info" : "success"
     );
   }
@@ -541,7 +542,7 @@
       const newFiles = files.filter(f => !existingPaths.has(f.path));
       return [...list, ...newFiles];
     });
-    showToast(`Added ${files.length} songs to queue`, "success");
+    showToast($t("library.addedSongsToQueue", { values: { count: files.length } }), "success");
     clearSelection();
   }
 
@@ -550,7 +551,7 @@
     const pl = $savedPlaylists.find(p => p.id === playlistId);
     addManyToSavedPlaylist(playlistId, files);
     showBulkPlaylistMenu = false;
-    showToast(`Added ${files.length} songs to "${pl?.name}"`, "success");
+    showToast($t("library.addedSongsToPlaylist", { values: { count: files.length, name: pl?.name } }), "success");
     clearSelection();
   }
 
@@ -565,7 +566,7 @@
     const files = getSelectedFileObjects();
     const id = createPlaylist(createPlaylistName.trim());
     addManyToSavedPlaylist(id, files);
-    showToast(`Created "${createPlaylistName.trim()}" with ${files.length} songs`, "success");
+    showToast($t("library.createdPlaylistWithSongs", { values: { name: createPlaylistName.trim(), count: files.length } }), "success");
     showCreatePlaylistModal = false;
     createPlaylistName = "";
     clearSelection();
@@ -582,15 +583,16 @@
     contextMenu = { x: e.clientX, y: e.clientY, file };
   }
 
-  const sortOptions = [
-    { id: "name-asc", label: "A-Z", icon: "mdi:sort-alphabetical-ascending" },
-    { id: "name-desc", label: "Z-A", icon: "mdi:sort-alphabetical-descending" },
-    { id: "duration-asc", label: "Shortest", icon: "mdi:sort-numeric-ascending" },
-    { id: "duration-desc", label: "Longest", icon: "mdi:sort-numeric-descending" },
-    { id: "bpm-asc", label: "Slow", icon: "mdi:speedometer-slow" },
-    { id: "bpm-desc", label: "Fast", icon: "mdi:speedometer" },
-    { id: "density-asc", label: "Easy", icon: "mdi:music-note" },
-    { id: "density-desc", label: "Dense", icon: "mdi:music-note-plus" },
+  // Make sortOptions reactive so labels update on language change
+  $: sortOptions = [
+    { id: "name-asc", label: $t("sort.nameAsc"), icon: "mdi:sort-alphabetical-ascending" },
+    { id: "name-desc", label: $t("sort.nameDesc"), icon: "mdi:sort-alphabetical-descending" },
+    { id: "duration-asc", label: $t("sort.durationAsc"), icon: "mdi:sort-numeric-ascending" },
+    { id: "duration-desc", label: $t("sort.durationDesc"), icon: "mdi:sort-numeric-descending" },
+    { id: "bpm-asc", label: $t("sort.bpmAsc"), icon: "mdi:speedometer-slow" },
+    { id: "bpm-desc", label: $t("sort.bpmDesc"), icon: "mdi:speedometer" },
+    { id: "density-asc", label: $t("sort.difficultyAsc"), icon: "mdi:music-note" },
+    { id: "density-desc", label: $t("sort.difficultyDesc"), icon: "mdi:music-note-plus" },
   ];
 
 </script>
@@ -604,8 +606,8 @@
     >
       <div class="text-center">
         <Icon icon="mdi:file-music" class="w-16 h-16 text-[#1db954] mx-auto mb-4" />
-        <p class="text-lg font-semibold text-[#1db954]">Drop MIDI files here</p>
-        <p class="text-sm text-white/60">Files will be added to your library</p>
+        <p class="text-lg font-semibold text-[#1db954]">{$t("library.dropFilesHere")}</p>
+        <p class="text-sm text-white/60">{$t("nav.library")}</p>
       </div>
     </div>
   {/if}
@@ -618,12 +620,12 @@
       transition:fly={{ y: -10, duration: 200 }}
     >
       <Icon icon="mdi:account-group" class="w-5 h-5 text-[#1db954]" />
-      <p class="text-sm flex-1">Select a song for Band Mode</p>
+      <p class="text-sm flex-1">{$t("band.selectSong")}</p>
       <button
         class="text-xs text-white/50 hover:text-white transition-colors"
         onclick={cancelBandSongSelect}
       >
-        Cancel
+        {$t("band.cancelSelection")}
       </button>
     </div>
   {/if}
@@ -631,7 +633,7 @@
   <!-- Header -->
   <div class="mb-4">
     <div class="flex items-center justify-between mb-2">
-      <h2 class="text-2xl font-bold">Your Library</h2>
+      <h2 class="text-2xl font-bold">{$t("library.title")}</h2>
       <div class="flex items-center gap-2">
         <!-- Play All / Shuffle All buttons -->
         {#if filteredFiles.length > 0 && !$isLoadingMidi}
@@ -639,23 +641,23 @@
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#1db954] hover:bg-[#1ed760] text-white text-sm font-medium transition-all"
             onclick={() => {
               playAllLibrary(filteredFiles, 0, false);
-              showToast(`Playing ${filteredFiles.length.toLocaleString()} songs`, "success");
+              showToast($t("library.playingSongs", { values: { count: filteredFiles.length.toLocaleString() } }), "success");
             }}
-            title="Play all songs in library"
+            title={$t("library.playAll")}
           >
             <Icon icon="mdi:play" class="w-4 h-4" />
-            Play All
+            {$t("library.playAll")}
           </button>
           <button
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-sm font-medium transition-all"
             onclick={() => {
               playAllLibrary(filteredFiles, 0, true);
-              showToast(`Shuffling ${filteredFiles.length.toLocaleString()} songs`, "success");
+              showToast($t("library.shufflingSongs", { values: { count: filteredFiles.length.toLocaleString() } }), "success");
             }}
-            title="Shuffle and play all songs"
+            title={$t("library.shuffleAll")}
           >
             <Icon icon="mdi:shuffle" class="w-4 h-4" />
-            Shuffle
+            {$t("library.shuffleAll")}
           </button>
         {/if}
         {#if $midiFiles.length > 0 && !$isLoadingMidi}
@@ -663,24 +665,24 @@
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-sm font-medium transition-all disabled:opacity-50"
             onclick={exportLibrary}
             disabled={isExporting}
-            title="Export entire library as zip"
+            title={$t("playlists.export")}
           >
             {#if isExporting}
               <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
-              {exportProgress.total > 0 ? `${Math.round(exportProgress.current / exportProgress.total * 100)}%` : 'Export'}
+              {exportProgress.total > 0 ? `${Math.round(exportProgress.current / exportProgress.total * 100)}%` : $t("playlists.export")}
             {:else}
               <Icon icon="mdi:export" class="w-4 h-4" />
-              Export
+              {$t("playlists.export")}
             {/if}
           </button>
         {/if}
         <button
           class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-sm font-medium transition-all"
           onclick={() => showImportModal = true}
-          title="Import MIDI files"
+          title={$t("playlists.import")}
         >
           <Icon icon="mdi:plus" class="w-4 h-4" />
-          Import
+          {$t("playlists.import")}
         </button>
       </div>
     </div>
@@ -689,17 +691,17 @@
         <span class="flex items-center gap-2">
           <Icon icon="mdi:loading" class="w-4 h-4 animate-spin text-[#1db954]" />
           {#if $midiLoadProgress.total > 0}
-            Loading {$midiLoadProgress.loaded.toLocaleString()} / {$midiLoadProgress.total.toLocaleString()} songs...
+            {$t("common.loading")} {$midiLoadProgress.loaded.toLocaleString()} / {$midiLoadProgress.total.toLocaleString()}
           {:else}
-            Scanning...
+            {$t("common.loading")}
           {/if}
         </span>
       {:else}
-        <span>{filteredFiles.length} of {$midiFiles.length} songs</span>
+        <span>{filteredFiles.length} {$t("library.of")} {$midiFiles.length} {$t("library.songs")}</span>
         <span class="text-white/30">•</span>
         <span class="text-xs text-white/30 flex items-center gap-1">
           <Icon icon="mdi:mouse" class="w-3 h-3" />
-          Ctrl+click to select • Shift+click for range
+          {$t("library.selectHint")}
         </span>
       {/if}
     </p>
@@ -708,7 +710,7 @@
     <SearchSort
       bind:searchQuery
       bind:sortBy
-      placeholder="Search songs..."
+      placeholder={$t("library.searchPlaceholder")}
       {sortOptions}
     />
   </div>
@@ -721,12 +723,12 @@
     >
       <div class="flex items-center gap-2 flex-1">
         <Icon icon="mdi:checkbox-multiple-marked" class="w-5 h-5 text-[#1db954]" />
-        <span class="text-sm font-medium">{selectedFiles.size} selected</span>
+        <span class="text-sm font-medium">{selectedFiles.size} {$t("library.selected")}</span>
         <button
           class="text-xs text-white/50 hover:text-white transition-colors underline"
           onclick={selectAll}
         >
-          Select all ({filteredFiles.filter(f => !isInvalidFile(f)).length})
+          {$t("library.selectAll")} ({filteredFiles.filter(f => !isInvalidFile(f)).length})
         </button>
       </div>
       <div class="flex items-center gap-2">
@@ -734,10 +736,10 @@
         <button
           class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-sm font-medium transition-all"
           onclick={addSelectedToQueue}
-          title="Add selected to queue"
+          title={$t("library.addToQueue")}
         >
           <Icon icon="mdi:playlist-plus" class="w-4 h-4" />
-          Queue
+          {$t("library.queue")}
         </button>
 
         <!-- Add to Playlist Dropdown -->
@@ -748,10 +750,10 @@
               e.stopPropagation();
               showBulkPlaylistMenu = !showBulkPlaylistMenu;
             }}
-            title="Add selected to playlist"
+            title={$t("library.addToPlaylist")}
           >
             <Icon icon="mdi:playlist-music" class="w-4 h-4" />
-            Add to Playlist
+            {$t("library.addToPlaylistBtn")}
             <Icon icon="mdi:chevron-down" class="w-4 h-4" />
           </button>
 
@@ -767,7 +769,7 @@
                 onclick={openCreatePlaylistModal}
               >
                 <Icon icon="mdi:playlist-plus" class="w-4 h-4 flex-shrink-0" />
-                <span>New Playlist...</span>
+                <span>{$t("library.newPlaylist")}</span>
               </button>
               {#if $savedPlaylists.length > 0}
                 <div class="border-t border-white/10 my-1"></div>
@@ -791,7 +793,7 @@
         <button
           class="p-1.5 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-all"
           onclick={clearSelection}
-          title="Clear selection"
+          title={$t("library.clearSelection")}
         >
           <Icon icon="mdi:close" class="w-5 h-5" />
         </button>
@@ -820,7 +822,7 @@
             ? 'bg-white/10 ring-1 ring-white/5'
             : 'hover:bg-white/5'} {invalid ? 'opacity-60' : ''}"
         style="height: {ITEM_HEIGHT}px; margin-bottom: 2px;"
-        title={invalid ? 'Invalid MIDI file - cannot parse' : 'Ctrl+click to select, Shift+click for range'}
+        title={invalid ? $t("library.invalidFile") : $t("library.selectHint")}
         oncontextmenu={(e) => handleContextMenu(e, file)}
         onclick={(e) => handleFileClick(e, file, index)}
       >
@@ -835,7 +837,7 @@
                 selectedFiles = new Set(selectedFiles);
                 selectedFiles.delete(file.hash);
               }}
-              title="Deselect"
+              title={$t("library.deselect")}
             >
               <Icon icon="mdi:check" class="w-4 h-4 text-black" />
             </button>
@@ -848,7 +850,7 @@
                 selectedFiles = new Set(selectedFiles);
                 selectedFiles.add(file.hash);
               }}
-              title="Select"
+              title={$t("library.select")}
             >
             </button>
           {:else if $currentFile === file.path && $isPlaying && !$isPaused}
@@ -880,7 +882,7 @@
                   e.stopPropagation();
                   handlePlay(file);
                 }}
-                title={$bandSongSelectMode ? "Select for Band" : "Play"}
+                title={$bandSongSelectMode ? $t("library.selectForBand") : $t("player.play")}
               >
                 <Icon icon={$bandSongSelectMode ? "mdi:check" : "mdi:play"} class="w-4 h-4 text-black" />
               </button>
@@ -922,9 +924,9 @@
           </p>
           <p class="text-xs {invalid ? 'text-red-400/60' : 'text-white/40'}">
             {#if invalid}
-              Invalid file
+              {$t("library.invalidFile")}
             {:else}
-              {file.bpm || 120} BPM • {#if (file.note_density || 0) < 3}Easy{:else if (file.note_density || 0) < 6}Medium{:else if (file.note_density || 0) < 10}Hard{:else}Expert{/if}
+              {file.bpm || 120} BPM • {#if (file.note_density || 0) < 3}{$t("library.easy")}{:else if (file.note_density || 0) < 6}{$t("library.medium")}{:else if (file.note_density || 0) < 10}{$t("library.hard")}{:else}{$t("library.expert")}{/if}
             {/if}
           </p>
         </div>
@@ -951,8 +953,8 @@
                 handleToggleFavorite(file);
               }}
               title={favoriteHashes.has(file.hash)
-                ? "Remove from favorites"
-                : "Add to favorites"}
+                ? $t("library.removeFromFavorites")
+                : $t("library.addToFavorites")}
             >
               <Icon
                 icon={favoriteHashes.has(file.hash) ? "mdi:heart" : "mdi:heart-outline"}
@@ -968,7 +970,7 @@
                   e.stopPropagation();
                   showPlaylistMenu = showPlaylistMenu === file.path ? null : file.path;
                 }}
-                title="Add to playlist"
+                title={$t("library.addToPlaylist")}
               >
                 <Icon icon="mdi:playlist-plus" class="w-5 h-5" />
               </button>
@@ -987,7 +989,7 @@
                   }}
                 >
                   <Icon icon="mdi:playlist-music" class="w-4 h-4" />
-                  Add to Queue
+                  {$t("library.addToQueue")}
                 </button>
 
                 {#if $savedPlaylists.length > 0}
@@ -1022,7 +1024,7 @@
     {#if $hasMoreFiles && !$isLoadingMidi}
       <div class="py-4 flex flex-col items-center gap-2 border-t border-white/5 mt-2">
         <p class="text-xs text-white/40">
-          Showing {$midiFiles.length.toLocaleString()} of {$totalMidiCount.toLocaleString()} songs
+          {$t("library.showingOf", { values: { loaded: $midiFiles.length.toLocaleString(), total: $totalMidiCount.toLocaleString() } })}
         </p>
         <div class="flex gap-2">
           <button
@@ -1030,15 +1032,15 @@
             onclick={loadMoreFiles}
           >
             <Icon icon="mdi:plus" class="w-4 h-4" />
-            Load 2,000 More
+            {$t("library.loadMore")}
           </button>
           <button
             class="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white/70 text-sm font-medium transition-colors flex items-center gap-2"
             onclick={loadAllFiles}
-            title="This may take a while for very large libraries"
+            title={$t("library.loadAll")}
           >
             <Icon icon="mdi:download" class="w-4 h-4" />
-            Load All
+            {$t("library.loadAll")}
           </button>
         </div>
       </div>
@@ -1066,9 +1068,9 @@
       >
         <Icon icon="mdi:loading" class="w-10 h-10 text-[#1db954] animate-spin" />
       </div>
-      <p class="text-lg font-semibold mb-2 text-white/60">Loading library...</p>
+      <p class="text-lg font-semibold mb-2 text-white/60">{$t("library.loadingLibrary")}</p>
       {#if $midiLoadProgress.total > 0}
-        <p class="text-sm mb-3">{$midiLoadProgress.loaded.toLocaleString()} / {$midiLoadProgress.total.toLocaleString()} songs</p>
+        <p class="text-sm mb-3">{$midiLoadProgress.loaded.toLocaleString()} / {$midiLoadProgress.total.toLocaleString()} {$t("library.songs")}</p>
         <!-- Progress bar -->
         <div class="w-48 h-1.5 bg-white/10 rounded-full overflow-hidden">
           <div
@@ -1077,7 +1079,7 @@
           ></div>
         </div>
       {:else}
-        <p class="text-sm">Scanning for MIDI files...</p>
+        <p class="text-sm">{$t("library.scanningFiles")}</p>
       {/if}
     </div>
   {:else if filteredFiles.length === 0 && searchQuery && !$isLoadingMidi}
@@ -1090,8 +1092,8 @@
       >
         <Icon icon="mdi:music-note-off" class="w-10 h-10 opacity-50" />
       </div>
-      <p class="text-lg font-semibold mb-2 text-white/60">No results found</p>
-      <p class="text-sm">Try a different search term</p>
+      <p class="text-lg font-semibold mb-2 text-white/60">{$t("library.noResultsFound")}</p>
+      <p class="text-sm">{$t("library.tryDifferentSearch")}</p>
     </div>
   {:else if $midiFiles.length === 0 && !$isLoadingMidi}
     <div
@@ -1103,8 +1105,8 @@
       >
         <Icon icon="mdi:music-note-plus" class="w-10 h-10 opacity-50" />
       </div>
-      <p class="text-lg font-semibold mb-2 text-white/60">No songs yet</p>
-      <p class="text-sm">Place MIDI files in the album folder</p>
+      <p class="text-lg font-semibold mb-2 text-white/60">{$t("library.noSongsYet")}</p>
+      <p class="text-sm">{$t("library.placeMidiFiles")}</p>
     </div>
   {/if}
 </div>
@@ -1150,7 +1152,7 @@
     >
       <!-- Header -->
       <div class="flex items-center justify-between p-4 border-b border-white/10">
-        <h3 class="text-lg font-bold">Import MIDI</h3>
+        <h3 class="text-lg font-bold">{$t("modals.import.title")}</h3>
         <button
           class="p-1 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-colors"
           onclick={() => { showImportModal = false; urlInput = ""; }}
@@ -1171,8 +1173,8 @@
               <Icon icon="mdi:file-music" class="w-5 h-5 text-white/60 group-hover:text-[#1db954] transition-colors" />
             </div>
             <div class="text-left">
-              <p class="font-semibold text-white group-hover:text-[#1db954] transition-colors">MIDI Files</p>
-              <p class="text-xs text-white/50">Select .mid files</p>
+              <p class="font-semibold text-white group-hover:text-[#1db954] transition-colors">{$t("modals.import.midiFiles")}</p>
+              <p class="text-xs text-white/50">{$t("modals.import.selectMidFiles")}</p>
             </div>
           </div>
         </button>
@@ -1189,8 +1191,8 @@
                 <Icon icon="mdi:folder-zip" class="w-5 h-5 text-white/60 group-hover:text-[#1db954] transition-colors" />
               </div>
               <div>
-                <p class="font-semibold text-sm text-white group-hover:text-[#1db954] transition-colors">ZIP File</p>
-                <p class="text-xs text-white/50">Extract .mid</p>
+                <p class="font-semibold text-sm text-white group-hover:text-[#1db954] transition-colors">{$t("modals.import.zipFile")}</p>
+                <p class="text-xs text-white/50">{$t("modals.import.extractMid")}</p>
               </div>
             </div>
           </button>
@@ -1205,8 +1207,8 @@
                 <Icon icon="mdi:folder-open" class="w-5 h-5 text-white/60 group-hover:text-[#1db954] transition-colors" />
               </div>
               <div>
-                <p class="font-semibold text-sm text-white group-hover:text-[#1db954] transition-colors">Folder</p>
-                <p class="text-xs text-white/50">Scan for .mid</p>
+                <p class="font-semibold text-sm text-white group-hover:text-[#1db954] transition-colors">{$t("modals.import.folder")}</p>
+                <p class="text-xs text-white/50">{$t("modals.import.scanForMid")}</p>
               </div>
             </div>
           </button>
@@ -1215,18 +1217,18 @@
         <!-- Divider -->
         <div class="flex items-center gap-3">
           <div class="flex-1 h-px bg-white/10"></div>
-          <span class="text-xs text-white/40">or paste URL</span>
+          <span class="text-xs text-white/40">{$t("modals.import.orPasteUrl")}</span>
           <div class="flex-1 h-px bg-white/10"></div>
         </div>
 
         <!-- URL Input -->
         <div>
-          <label class="block text-sm font-medium text-white/70 mb-2">Paste URL</label>
+          <label class="block text-sm font-medium text-white/70 mb-2">{$t("modals.import.pasteUrl")}</label>
           <div class="flex gap-2">
             <input
               type="text"
               bind:value={urlInput}
-              placeholder="https://example.com/song.mid"
+              placeholder={$t("modals.import.urlPlaceholder")}
               class="flex-1 px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-[#1db954] focus:border-transparent transition-all"
               onkeydown={(e) => e.key === 'Enter' && downloadFromUrl()}
               use:autofocus
@@ -1241,10 +1243,10 @@
               {:else}
                 <Icon icon="mdi:download" class="w-4 h-4" />
               {/if}
-              {isDownloading ? 'Downloading...' : 'Download'}
+              {isDownloading ? $t("modals.import.downloading") : $t("modals.import.download")}
             </button>
           </div>
-          <p class="text-xs text-white/40 mt-2">Works with direct .mid links from Discord, etc.</p>
+          <p class="text-xs text-white/40 mt-2">{$t("modals.import.urlHint")}</p>
         </div>
       </div>
     </div>
@@ -1270,14 +1272,14 @@
         <div class="w-12 h-12 rounded-full bg-[#1db954]/20 flex items-center justify-center mx-auto mb-3">
           <Icon icon="mdi:playlist-plus" class="w-6 h-6 text-[#1db954]" />
         </div>
-        <h3 class="text-lg font-bold mb-2">Create Playlist?</h3>
+        <h3 class="text-lg font-bold mb-2">{$t("modals.createPlaylist.createFromImport")}</h3>
         <p class="text-sm text-white/60 mb-4">
-          {lastImportedFiles.length} songs imported. Create a playlist?
+          {$t("modals.createPlaylist.songsImported", { values: { count: lastImportedFiles.length } })}
         </p>
         <input
           type="text"
           bind:value={newPlaylistName}
-          placeholder="Playlist name"
+          placeholder={$t("modals.createPlaylist.playlistName")}
           class="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-[#1db954] focus:border-transparent transition-all mb-4"
           onkeydown={(e) => e.key === 'Enter' && createPlaylistFromImport()}
         />
@@ -1288,14 +1290,14 @@
           class="flex-1 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white font-medium text-sm transition-colors"
           onclick={skipPlaylistPrompt}
         >
-          Skip
+          {$t("modals.createPlaylist.skip")}
         </button>
         <button
           class="flex-1 py-2 rounded-lg bg-[#1db954] hover:bg-[#1ed760] text-white font-medium text-sm transition-colors disabled:opacity-50"
           onclick={createPlaylistFromImport}
           disabled={!newPlaylistName.trim()}
         >
-          Create
+          {$t("common.create")}
         </button>
       </div>
     </div>
@@ -1321,14 +1323,14 @@
         <div class="w-12 h-12 rounded-full bg-[#1db954]/20 flex items-center justify-center mx-auto mb-3">
           <Icon icon="mdi:playlist-plus" class="w-6 h-6 text-[#1db954]" />
         </div>
-        <h3 class="text-lg font-bold mb-2">Create Playlist</h3>
+        <h3 class="text-lg font-bold mb-2">{$t("modals.createPlaylist.title")}</h3>
         <p class="text-sm text-white/60 mb-4">
-          {selectedFiles.size} songs selected
+          {$t("modals.createPlaylist.songsSelected", { values: { count: selectedFiles.size } })}
         </p>
         <input
           type="text"
           bind:value={createPlaylistName}
-          placeholder="Playlist name"
+          placeholder={$t("modals.createPlaylist.playlistName")}
           class="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-[#1db954] focus:border-transparent transition-all mb-4"
           onkeydown={(e) => e.key === 'Enter' && createPlaylistFromSelected()}
         />
@@ -1339,14 +1341,14 @@
           class="flex-1 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white font-medium text-sm transition-colors"
           onclick={() => { showCreatePlaylistModal = false; createPlaylistName = ""; }}
         >
-          Cancel
+          {$t("common.cancel")}
         </button>
         <button
           class="flex-1 py-2 rounded-lg bg-[#1db954] hover:bg-[#1ed760] text-white font-medium text-sm transition-colors disabled:opacity-50"
           onclick={createPlaylistFromSelected}
           disabled={!createPlaylistName.trim()}
         >
-          Create
+          {$t("common.create")}
         </button>
       </div>
     </div>

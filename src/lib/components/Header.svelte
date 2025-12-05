@@ -1,5 +1,6 @@
 <script>
   import { getCurrentWindow } from '@tauri-apps/api/window';
+  import { t } from "svelte-i18n";
   import {
     isMinimized,
     isDraggable,
@@ -25,22 +26,22 @@
 
 <div class="flex items-center justify-between px-6 py-4 border-b border-white/10 {$isDraggable ? 'drag-handle' : ''}">
   <div class="flex items-center gap-3 no-drag">
-    <h1 class="text-sm font-semibold tracking-[0.3em] text-white uppercase">WWM MIDI PLAYER</h1>
+    <h1 class="text-sm font-semibold tracking-[0.3em] text-white uppercase">{$t("header.title")}</h1>
 
     <button
       class="px-3 py-1 rounded-full text-[11px] font-medium border transition-colors {$isDraggable ? 'bg-white text-black border-transparent shadow' : 'border-white/20 text-white/70'}"
       on:click={toggleDraggable}
-      title="Toggle interaction mode"
+      title={$t("header.interactive")}
     >
-      {$isDraggable ? 'Interactive' : 'Click-through'}
+      {$isDraggable ? $t("header.interactive") : $t("header.clickThrough")}
     </button>
 
     <button
       class="px-3 py-1 rounded-full text-[11px] font-medium border transition-colors {$smartPause ? 'border-white/30 text-white' : 'border-white/10 text-white/60'}"
       on:click={toggleSmartPause}
-      title="Auto-pause when game loses focus"
+      title={$t("settings.playback.smartPauseDesc")}
     >
-      {$smartPause ? 'Smart Pause' : 'Manual'}
+      {$smartPause ? $t("settings.playback.smartPause") : 'Manual'}
     </button>
   </div>
 
@@ -48,7 +49,7 @@
     <button
       class="p-2 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors"
       on:click={minimize}
-      title="{$isMinimized ? 'Expand' : 'Minimize'}"
+      title={$t("header.minimize")}
     >
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         {#if $isMinimized}
@@ -62,7 +63,7 @@
     <button
       class="p-2 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors"
       on:click={loadMidiFiles}
-      title="Refresh album"
+      title={$t("nav.library")}
     >
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v6h6M20 20v-6h-6M5 19a9 9 0 0114-7.5M19 5a9 9 0 01-14 7.5" />
@@ -72,7 +73,7 @@
     <button
       class="p-2 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors"
       on:click={close}
-      title="Close"
+      title={$t("header.close")}
     >
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />

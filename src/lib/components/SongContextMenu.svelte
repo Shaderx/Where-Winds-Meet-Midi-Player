@@ -2,6 +2,7 @@
   import Icon from "@iconify/svelte";
   import { fade, fly } from "svelte/transition";
   import { invoke } from "@tauri-apps/api/core";
+  import { t } from "svelte-i18n";
   import { loadMidiFiles, removeDeletedFile } from "../stores/player.js";
 
   // Props
@@ -89,14 +90,14 @@
       onclick={openRenameModal}
     >
       <Icon icon="mdi:pencil" class="w-4 h-4" />
-      Rename
+      {$t("contextMenu.rename")}
     </button>
     <button
       class="w-full px-3 py-2 text-left text-sm text-white/80 hover:bg-white/10 flex items-center gap-2"
       onclick={handleOpenFolder}
     >
       <Icon icon="mdi:folder-open" class="w-4 h-4" />
-      Open Location
+      {$t("contextMenu.openLocation")}
     </button>
     <div class="border-t border-white/10 my-1"></div>
     <button
@@ -104,7 +105,7 @@
       onclick={openDeleteModal}
     >
       <Icon icon="mdi:delete" class="w-4 h-4" />
-      Delete
+      {$t("contextMenu.delete")}
     </button>
   </div>
 {/if}
@@ -128,9 +129,9 @@
         <div class="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-3">
           <Icon icon="mdi:delete-alert" class="w-6 h-6 text-red-400" />
         </div>
-        <h3 class="text-lg font-bold mb-2">Delete Song?</h3>
+        <h3 class="text-lg font-bold mb-2">{$t("modals.deleteSong.title")}</h3>
         <p class="text-sm text-white/60 mb-1">"{deletingFile.name}"</p>
-        <p class="text-xs text-white/40">This cannot be undone.</p>
+        <p class="text-xs text-white/40">{$t("modals.deleteSong.cannotBeUndone")}</p>
       </div>
 
       <div class="flex gap-2 p-4 pt-0">
@@ -138,13 +139,13 @@
           class="flex-1 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white font-medium text-sm transition-colors"
           onclick={() => { showDeleteModal = false; deletingFile = null; }}
         >
-          Cancel
+          {$t("common.cancel")}
         </button>
         <button
           class="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-medium text-sm transition-colors"
           onclick={confirmDelete}
         >
-          Delete
+          {$t("common.delete")}
         </button>
       </div>
     </div>
@@ -167,7 +168,7 @@
       transition:fly={{ y: 20, duration: 200 }}
     >
       <div class="flex items-center justify-between p-4 border-b border-white/10">
-        <h3 class="text-lg font-bold">Rename</h3>
+        <h3 class="text-lg font-bold">{$t("modals.rename.title")}</h3>
         <button
           class="p-1 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-colors"
           onclick={() => { showRenameModal = false; renamingFile = null; }}
@@ -184,7 +185,7 @@
           onkeydown={(e) => e.key === 'Enter' && handleRename()}
           autofocus
         />
-        <p class="text-xs text-white/40 mt-2">.mid extension will be added automatically</p>
+        <p class="text-xs text-white/40 mt-2">{$t("modals.rename.extensionNote")}</p>
       </div>
 
       <div class="flex gap-2 p-4 pt-0">
@@ -192,13 +193,13 @@
           class="flex-1 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white font-medium text-sm transition-colors"
           onclick={() => { showRenameModal = false; renamingFile = null; }}
         >
-          Cancel
+          {$t("common.cancel")}
         </button>
         <button
           class="flex-1 py-2 rounded-lg bg-[#1db954] hover:bg-[#1ed760] text-white font-medium text-sm transition-colors"
           onclick={handleRename}
         >
-          Rename
+          {$t("contextMenu.rename")}
         </button>
       </div>
     </div>

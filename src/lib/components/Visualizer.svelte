@@ -1,6 +1,7 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import { t } from "svelte-i18n";
   import { currentFile, isPlaying, isPaused, currentPosition } from "../stores/player.js";
 
   let canvas;
@@ -187,7 +188,7 @@
   <canvas bind:this={canvas} class="w-full h-full"></canvas>
   {#if !$currentFile}
     <div class="absolute inset-0 flex items-center justify-center text-white/20 text-xs">
-      Select a track
+      {$t("trackSelector.selectTrack")}
     </div>
   {/if}
 </div>

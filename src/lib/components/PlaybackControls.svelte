@@ -2,6 +2,7 @@
   export let compact = false;
   export let keybindings = { pause_resume: "F9", previous: "F10", next: "F11" };
   import Icon from '@iconify/svelte';
+  import { t } from "svelte-i18n";
 
   import {
     isPlaying,
@@ -22,7 +23,7 @@
   <button
     class="transition-colors {$shuffleMode ? 'text-[#1db954]' : 'text-white/40 hover:text-white'}"
     on:click={toggleShuffle}
-    title="Shuffle"
+    title={$t("player.shuffle")}
   >
     <Icon icon="mdi:shuffle" class="w-4 h-4" />
   </button>
@@ -32,7 +33,7 @@
     class="text-white/60 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
     on:click={playPrevious}
     disabled={!$isPlaying}
-    title="Previous ({keybindings.previous})"
+    title="{$t("player.previous")} ({keybindings.previous})"
   >
     <Icon icon="mdi:skip-previous" class="w-5 h-5" />
   </button>
@@ -41,7 +42,7 @@
   <button
     class="w-8 h-8 rounded-full bg-white hover:scale-105 transition-transform flex items-center justify-center"
     on:click={pauseResume}
-    title="Play/Pause ({keybindings.pause_resume})"
+    title="{$t("controls.playPause")} ({keybindings.pause_resume})"
   >
     {#if $isPlaying && !$isPaused}
       <Icon icon="mdi:pause" class="w-5 h-5 text-black" />
@@ -55,7 +56,7 @@
     class="text-white/60 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
     on:click={playNext}
     disabled={!$isPlaying}
-    title="Next ({keybindings.next})"
+    title="{$t("player.next")} ({keybindings.next})"
   >
     <Icon icon="mdi:skip-next" class="w-5 h-5" />
   </button>
@@ -64,7 +65,7 @@
   <button
     class="transition-colors {$loopMode ? 'text-[#1db954]' : 'text-white/40 hover:text-white'}"
     on:click={toggleLoop}
-    title="Loop"
+    title={$t("player.loop")}
   >
     <Icon icon="mdi:repeat" class="w-4 h-4" />
   </button>
