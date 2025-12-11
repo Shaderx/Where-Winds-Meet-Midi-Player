@@ -1032,6 +1032,12 @@ async fn cmd_unfocus_window() -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn cmd_exit_app(app: tauri::AppHandle) -> Result<(), String> {
+    app.exit(0);
+    Ok(())
+}
+
+#[tauri::command]
 async fn press_key(key: String) -> Result<(), String> {
     keyboard::key_down(&key);
     keyboard::key_up(&key);
@@ -3187,6 +3193,7 @@ fn main() {
             cmd_reset_keybindings,
             cmd_set_keybindings_enabled,
             cmd_unfocus_window,
+            cmd_exit_app,
             press_key,
             tap_key,
             is_game_focused,

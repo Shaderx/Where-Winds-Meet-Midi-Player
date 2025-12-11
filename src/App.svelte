@@ -1,6 +1,6 @@
 <script>
   import { onMount } from "svelte";
-  import { fade, fly } from "svelte/transition";
+  import { fade, fly, scale } from "svelte/transition";
   import { listen } from "@tauri-apps/api/event";
   import { invoke } from "@tauri-apps/api/core";
   import { onDestroy } from "svelte";
@@ -188,6 +188,16 @@
     }
   }
 
+  async function closeApp() {
+    try {
+      showCloseConfirmModal = false;
+      await saveWindowPosition();
+      await invoke('cmd_exit_app');
+    } catch (e) {
+      console.error('Failed to close app:', e);
+    }
+  }
+
   onDestroy(() => {
     if (checkInterval) clearInterval(checkInterval);
     if (savePositionInterval) clearInterval(savePositionInterval);
@@ -292,6 +302,7 @@
   let showVisualizer = false;
   let showUpdateModal = false;
   let showLargeLibraryModal = false;
+  let showCloseConfirmModal = false;
   let largeLibraryCount = 0;
 
   // Load tracks when current file changes
@@ -655,6 +666,13 @@
                   title="Minimize to floating icon"
                 >
                   <Icon icon="mdi:minus" class="w-4 h-4" />
+                </button>
+                <button
+                  class="w-7 h-7 flex items-center justify-center rounded-md text-white/40 hover:text-red-400 hover:bg-red-400/10 transition-all"
+                  onclick={() => showCloseConfirmModal = true}
+                  title="Close application"
+                >
+                  <Icon icon="mdi:close" class="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -1316,6 +1334,49 @@
           >
             <Icon icon="mdi:download" class="w-4 h-4" />
             {$t("modals.largeLibrary.loadAll")}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Close Confirmation Modal -->
+{#if showCloseConfirmModal}
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center"
+    transition:fade={{ duration: 150 }}
+  >
+    <button class="absolute inset-0 bg-black/60" onclick={() => showCloseConfirmModal = false}></button>
+
+    <div
+      class="relative bg-[#282828] rounded-xl shadow-2xl w-[350px] max-w-[90vw] overflow-hidden"
+      transition:scale={{ duration: 150, start: 0.95 }}
+    >
+      <div class="p-5 space-y-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+            <Icon icon="mdi:power" class="w-5 h-5 text-red-400" />
+          </div>
+          <div>
+            <h3 class="text-lg font-bold">{$t("modals.closeApp.title")}</h3>
+            <p class="text-sm text-white/50">{$t("modals.closeApp.message")}</p>
+          </div>
+        </div>
+
+        <div class="flex gap-2">
+          <button
+            class="flex-1 px-4 py-2.5 rounded-lg bg-white/10 hover:bg-white/15 text-white font-medium text-sm transition-colors"
+            onclick={() => showCloseConfirmModal = false}
+          >
+            {$t("modals.closeApp.cancel")}
+          </button>
+          <button
+            class="flex-1 px-4 py-2.5 rounded-lg bg-red-500 hover:bg-red-600 text-white font-medium text-sm transition-colors flex items-center justify-center gap-2"
+            onclick={closeApp}
+          >
+            <Icon icon="mdi:power" class="w-4 h-4" />
+            {$t("modals.closeApp.exit")}
           </button>
         </div>
       </div>

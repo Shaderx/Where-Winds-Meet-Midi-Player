@@ -353,6 +353,12 @@
     },
     "importing": {
       "title": "파일 가져오는 중..."
+    },
+    "closeApp": {
+      "title": "앱 종료",
+      "message": "종료하시겠습니까?",
+      "cancel": "취소",
+      "exit": "종료"
     }
   },
   "sort": {

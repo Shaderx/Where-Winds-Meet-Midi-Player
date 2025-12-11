@@ -353,6 +353,12 @@
     },
     "importing": {
       "title": "Importing files..."
+    },
+    "closeApp": {
+      "title": "Exit Application",
+      "message": "Are you sure you want to close?",
+      "cancel": "Cancel",
+      "exit": "Exit"
     }
   },
   "sort": {

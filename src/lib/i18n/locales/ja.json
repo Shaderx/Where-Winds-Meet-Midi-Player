@@ -353,6 +353,12 @@
     },
     "importing": {
       "title": "ファイルをインポート中..."
+    },
+    "closeApp": {
+      "title": "アプリを終了",
+      "message": "終了してもよろしいですか？",
+      "cancel": "キャンセル",
+      "exit": "終了"
     }
   },
   "sort": {
