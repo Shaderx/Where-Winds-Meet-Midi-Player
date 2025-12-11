@@ -61,7 +61,7 @@ static ALBUM_PATH: RwLock<Option<String>> = RwLock::new(None);
 // Keybindings configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeyBindings {
-    pub pause_resume: String,  // Default: "F9"
+    pub pause_resume: String,  // Default: "ScrollLock"
     pub stop: String,          // Default: "F12"
     pub previous: String,      // Default: "F10"
     pub next: String,          // Default: "F11"
@@ -73,7 +73,7 @@ pub struct KeyBindings {
 impl Default for KeyBindings {
     fn default() -> Self {
         KeyBindings {
-            pause_resume: "F9".to_string(),
+            pause_resume: "ScrollLock".to_string(),
             stop: "F12".to_string(),
             previous: "F10".to_string(),
             next: "F11".to_string(),
@@ -2779,7 +2779,7 @@ fn register_global_hotkeys() -> Vec<(String, bool)> {
 }
 
 // Cached keybinding VK codes for low-level hook
-static mut CACHED_PAUSE_RESUME_VK: u32 = 0x78; // F9
+static mut CACHED_PAUSE_RESUME_VK: u32 = 0x91; // ScrollLock
 static mut CACHED_STOP_VK: u32 = 0x7B;         // F12
 static mut CACHED_PREVIOUS_VK: u32 = 0x79;     // F10
 static mut CACHED_NEXT_VK: u32 = 0x7A;         // F11
@@ -2819,7 +2819,7 @@ fn vk_to_key(vk: u32) -> Option<String> {
 fn cache_keybinding_vks() {
     let kb = get_keybindings();
     unsafe {
-        CACHED_PAUSE_RESUME_VK = key_to_vk(&kb.pause_resume).unwrap_or(0x78);
+        CACHED_PAUSE_RESUME_VK = key_to_vk(&kb.pause_resume).unwrap_or(0x91);
         CACHED_STOP_VK = key_to_vk(&kb.stop).unwrap_or(0x7B);
         CACHED_PREVIOUS_VK = key_to_vk(&kb.previous).unwrap_or(0x79);
         CACHED_NEXT_VK = key_to_vk(&kb.next).unwrap_or(0x7A);

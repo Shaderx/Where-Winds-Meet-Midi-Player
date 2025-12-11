@@ -2,6 +2,9 @@
 
 A beautiful, feature-rich MIDI music player for **Where Winds Meet** that plays your songs by automatically pressing the correct keyboard keys in-game.
 
+> ⚠️ **WARNING: Use at Your Own Risk**
+> The publisher has started banning players for using third-party tools (a broad category that includes many types of programs). It is unclear whether MIDI players specifically trigger bans, but the risk exists. Chinese server players have not yet reported any bans for using MIDI players. Proceed with caution.
+
 <p align="center">
   <img width="780" alt="WWM Overlay screenshot" src="https://github.com/user-attachments/assets/8977b742-7f7d-47d9-b78f-d36ed677e3c5" />
 </p>
@@ -167,8 +170,8 @@ If you enjoy this app and want to support development:
 3. **Add to queue**  
    Use the playlist icon to add songs to **queue** or **playlists**.
 
-4. **Play**  
-   Click **Play** or press **`F9`**.
+4. **Play**
+   Click **Play** or press **`ScrollLock`**.
 
 5. **Enjoy**  
    The app sends keys directly to the game window.  
@@ -182,16 +185,16 @@ If you enjoy this app and want to support development:
 
 These work even when the game has focus:
 
-| Key        | Action                |
-|-----------:|-----------------------|
-| **F9**     | Play / Pause          |
-| **F10**    | Previous track        |
-| **F11**    | Next track            |
-| **F12**    | Stop                  |
-| **End**    | Stop (alternative)    |
-| **`[`**    | Previous note mode    |
-| **`]`**    | Next note mode        |
-| **Insert** | Toggle mini mode      |
+| Key            | Action                |
+|--------------:|-----------------------|
+| **ScrollLock** | Play / Pause          |
+| **F10**        | Previous track        |
+| **F11**        | Next track            |
+| **F12**        | Stop                  |
+| **End**        | Stop (alternative)    |
+| **`[`**        | Previous note mode    |
+| **`]`**        | Next note mode        |
+| **Insert**     | Toggle mini mode      |
 
 ---
 
