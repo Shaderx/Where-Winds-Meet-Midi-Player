@@ -474,6 +474,15 @@
     "kickPlayer": "プレイヤーをキック",
     "starting": "開始中..."
   },
+  "autoClicker": {
+    "title": "オートクリッカー",
+    "key": "送信するキー",
+    "delay": "クリック間隔",
+    "hotkey": "トグルホットキー",
+    "description": "設定した間隔でゲームウィンドウにキー入力を自動送信します。",
+    "enabled": "オートクリッカー有効",
+    "disabled": "オートクリッカー無効"
+  },
   "share": {
     "title": "ライブラリ共有",
     "downloaded": "ダウンロード済み",

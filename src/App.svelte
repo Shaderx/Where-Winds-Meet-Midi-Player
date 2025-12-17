@@ -219,6 +219,7 @@
   import Visualizer from "./lib/components/Visualizer.svelte";
   import BandMode from "./lib/components/BandMode.svelte";
   import LibraryShare from "./lib/components/LibraryShare.svelte";
+  import AutoClicker from "./lib/components/AutoClicker.svelte";
 
   import { bandStatus, connectedPeers, bandSongSelectMode, cancelBandSongSelect, bandSelectedSong } from "./lib/stores/band.js";
   import { libraryConnected, onlinePeers, initLibrary, shareNotification, libraryEnabled } from "./lib/stores/library.js";
@@ -1063,6 +1064,9 @@
                 <Icon icon="mdi:chart-bar" class="w-3.5 h-3.5" />
               </button>
               -->
+
+              <!-- Auto Clicker -->
+              <AutoClicker />
 
               <!-- Update Available -->
               {#if updateAvailable}

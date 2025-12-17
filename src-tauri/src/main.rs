@@ -91,6 +91,123 @@ fn get_keybindings() -> KeyBindings {
     KEYBINDINGS.read().unwrap().clone().unwrap_or_default()
 }
 
+// ============ Auto Clicker State ============
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+
+// Auto clicker configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutoClickerConfig {
+    pub key: String,
+    pub delay_ms: u64,
+    pub enabled: bool,
+    pub hotkey: String,
+}
+
+impl Default for AutoClickerConfig {
+    fn default() -> Self {
+        AutoClickerConfig {
+            key: "f".to_string(),
+            delay_ms: 100,
+            enabled: false,
+            hotkey: "F8".to_string(),
+        }
+    }
+}
+
+// Global auto clicker state
+static AUTO_CLICKER_ENABLED: AtomicBool = AtomicBool::new(false);
+static AUTO_CLICKER_DELAY_MS: AtomicU64 = AtomicU64::new(100);
+static AUTO_CLICKER_KEY: RwLock<Option<String>> = RwLock::new(None);
+static AUTO_CLICKER_HOTKEY: RwLock<Option<String>> = RwLock::new(None);
+
+fn get_auto_clicker_key() -> String {
+    AUTO_CLICKER_KEY.read().unwrap().clone().unwrap_or_else(|| "f".to_string())
+}
+
+fn set_auto_clicker_key(key: &str) {
+    if let Ok(mut guard) = AUTO_CLICKER_KEY.write() {
+        *guard = Some(key.to_lowercase());
+    }
+}
+
+fn get_auto_clicker_hotkey() -> String {
+    AUTO_CLICKER_HOTKEY.read().unwrap().clone().unwrap_or_else(|| "F8".to_string())
+}
+
+fn set_auto_clicker_hotkey_str(hotkey: &str) {
+    if let Ok(mut guard) = AUTO_CLICKER_HOTKEY.write() {
+        *guard = Some(hotkey.to_string());
+    }
+}
+
+fn load_auto_clicker_config() {
+    let config = load_config();
+    if let Some(ac) = config.get("auto_clicker") {
+        if let Ok(auto_clicker) = serde_json::from_value::<AutoClickerConfig>(ac.clone()) {
+            set_auto_clicker_key(&auto_clicker.key);
+            AUTO_CLICKER_DELAY_MS.store(auto_clicker.delay_ms, Ordering::SeqCst);
+            set_auto_clicker_hotkey_str(&auto_clicker.hotkey);
+            app_log!("[AUTO_CLICKER] Loaded config: key='{}', delay={}ms, hotkey='{}'", 
+                auto_clicker.key, auto_clicker.delay_ms, auto_clicker.hotkey);
+        }
+    }
+}
+
+fn save_auto_clicker_config() {
+    let config_data = AutoClickerConfig {
+        key: get_auto_clicker_key(),
+        delay_ms: AUTO_CLICKER_DELAY_MS.load(Ordering::SeqCst),
+        enabled: false, // Don't persist enabled state
+        hotkey: get_auto_clicker_hotkey(),
+    };
+    let mut config = load_config();
+    config["auto_clicker"] = serde_json::to_value(&config_data).unwrap_or_default();
+    save_config(&config);
+}
+
+// Auto clicker thread handle
+static AUTO_CLICKER_THREAD_RUNNING: AtomicBool = AtomicBool::new(false);
+
+fn start_auto_clicker_thread() {
+    // Don't start if already running
+    if AUTO_CLICKER_THREAD_RUNNING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+
+    thread::spawn(move || {
+        app_log!("[AUTO_CLICKER] Thread started");
+        
+        while AUTO_CLICKER_ENABLED.load(Ordering::SeqCst) {
+            let key = get_auto_clicker_key();
+            let delay = AUTO_CLICKER_DELAY_MS.load(Ordering::SeqCst);
+            
+            // Send key press using background key send (same as MIDI playback)
+            keyboard::key_down(&key);
+            thread::sleep(std::time::Duration::from_millis(30));
+            keyboard::key_up(&key);
+            
+            // Wait for the configured delay
+            thread::sleep(std::time::Duration::from_millis(delay));
+        }
+        
+        AUTO_CLICKER_THREAD_RUNNING.store(false, Ordering::SeqCst);
+        app_log!("[AUTO_CLICKER] Thread stopped");
+    });
+}
+
+fn toggle_auto_clicker() -> bool {
+    let was_enabled = AUTO_CLICKER_ENABLED.load(Ordering::SeqCst);
+    let new_state = !was_enabled;
+    AUTO_CLICKER_ENABLED.store(new_state, Ordering::SeqCst);
+    
+    if new_state {
+        start_auto_clicker_thread();
+    }
+    
+    app_log!("[AUTO_CLICKER] Toggled: {} -> {}", was_enabled, new_state);
+    new_state
+}
+
 fn load_saved_keybindings() {
     let config = load_config();
     if let Some(kb) = config.get("keybindings") {
@@ -2792,6 +2909,7 @@ static mut CACHED_NEXT_VK: u32 = 0x7A;         // F11
 static mut CACHED_MODE_PREV_VK: u32 = 0xDB;    // [
 static mut CACHED_MODE_NEXT_VK: u32 = 0xDD;    // ]
 static mut CACHED_TOGGLE_MINI_VK: u32 = 0x2D;  // Insert
+static mut CACHED_AUTO_CLICKER_VK: u32 = 0x77; // F8 (default)
 static mut KEYBINDINGS_DISABLED: bool = false; // Disable during recording
 static mut RECORDING_MODE: bool = false;       // When true, emit key names instead of actions
 
@@ -2824,6 +2942,7 @@ fn vk_to_key(vk: u32) -> Option<String> {
 
 fn cache_keybinding_vks() {
     let kb = get_keybindings();
+    let ac_hotkey = get_auto_clicker_hotkey();
     unsafe {
         CACHED_PAUSE_RESUME_VK = key_to_vk(&kb.pause_resume).unwrap_or(0x91);
         CACHED_STOP_VK = key_to_vk(&kb.stop).unwrap_or(0x7B);
@@ -2832,10 +2951,20 @@ fn cache_keybinding_vks() {
         CACHED_MODE_PREV_VK = key_to_vk(&kb.mode_prev).unwrap_or(0xDB);
         CACHED_MODE_NEXT_VK = key_to_vk(&kb.mode_next).unwrap_or(0xDD);
         CACHED_TOGGLE_MINI_VK = key_to_vk(&kb.toggle_mini).unwrap_or(0x2D);
+        CACHED_AUTO_CLICKER_VK = key_to_vk(&ac_hotkey).unwrap_or(0x77);
     }
-    app_log!("[KEYBINDINGS] Reloaded: pause={:02X} stop={:02X} prev={:02X} next={:02X}",
+    app_log!("[KEYBINDINGS] Reloaded: pause={:02X} stop={:02X} prev={:02X} next={:02X} auto_clicker={:02X}",
         unsafe { CACHED_PAUSE_RESUME_VK }, unsafe { CACHED_STOP_VK },
-        unsafe { CACHED_PREVIOUS_VK }, unsafe { CACHED_NEXT_VK });
+        unsafe { CACHED_PREVIOUS_VK }, unsafe { CACHED_NEXT_VK }, unsafe { CACHED_AUTO_CLICKER_VK });
+}
+
+// Re-cache auto clicker hotkey when it changes
+pub fn refresh_auto_clicker_hotkey() {
+    let ac_hotkey = get_auto_clicker_hotkey();
+    unsafe {
+        CACHED_AUTO_CLICKER_VK = key_to_vk(&ac_hotkey).unwrap_or(0x77);
+    }
+    app_log!("[AUTO_CLICKER] Hotkey VK cached: {:02X}", unsafe { CACHED_AUTO_CLICKER_VK });
 }
 
 // Low-level keyboard hook callback for all keybindings
@@ -2877,6 +3006,10 @@ unsafe extern "system" fn low_level_keyboard_proc(
                         let _ = app_handle.emit("global-shortcut", "mode_next");
                     } else if vk == CACHED_TOGGLE_MINI_VK {
                         let _ = app_handle.emit("global-shortcut", "toggle_mini");
+                    } else if vk == CACHED_AUTO_CLICKER_VK {
+                        // Toggle auto clicker directly and emit state change
+                        let new_state = toggle_auto_clicker();
+                        let _ = app_handle.emit("auto-clicker-toggled", new_state);
                     }
                 }
             }
@@ -3084,6 +3217,84 @@ async fn get_live_transpose(
 }
 
 /// DEV: Simulate a MIDI note press (for testing without hardware)
+// ============ Auto Clicker Commands ============
+
+#[tauri::command]
+async fn auto_clicker_start() -> Result<bool, String> {
+    if !AUTO_CLICKER_ENABLED.load(Ordering::SeqCst) {
+        AUTO_CLICKER_ENABLED.store(true, Ordering::SeqCst);
+        start_auto_clicker_thread();
+    }
+    Ok(true)
+}
+
+#[tauri::command]
+async fn auto_clicker_stop() -> Result<bool, String> {
+    AUTO_CLICKER_ENABLED.store(false, Ordering::SeqCst);
+    Ok(false)
+}
+
+#[tauri::command]
+async fn auto_clicker_toggle() -> Result<bool, String> {
+    Ok(toggle_auto_clicker())
+}
+
+#[tauri::command]
+async fn auto_clicker_set_key(key: String) -> Result<(), String> {
+    set_auto_clicker_key(&key);
+    save_auto_clicker_config();
+    app_log!("[AUTO_CLICKER] Key set to: {}", key);
+    Ok(())
+}
+
+#[tauri::command]
+async fn auto_clicker_get_key() -> Result<String, String> {
+    Ok(get_auto_clicker_key())
+}
+
+#[tauri::command]
+async fn auto_clicker_set_delay(delay_ms: u64) -> Result<(), String> {
+    let clamped = delay_ms.max(10).min(5000); // Min 10ms, max 5000ms
+    AUTO_CLICKER_DELAY_MS.store(clamped, Ordering::SeqCst);
+    save_auto_clicker_config();
+    app_log!("[AUTO_CLICKER] Delay set to: {}ms", clamped);
+    Ok(())
+}
+
+#[tauri::command]
+async fn auto_clicker_get_delay() -> Result<u64, String> {
+    Ok(AUTO_CLICKER_DELAY_MS.load(Ordering::SeqCst))
+}
+
+#[tauri::command]
+async fn auto_clicker_is_enabled() -> Result<bool, String> {
+    Ok(AUTO_CLICKER_ENABLED.load(Ordering::SeqCst))
+}
+
+#[tauri::command]
+async fn auto_clicker_set_hotkey(hotkey: String) -> Result<(), String> {
+    set_auto_clicker_hotkey_str(&hotkey);
+    save_auto_clicker_config();
+    refresh_auto_clicker_hotkey();
+    app_log!("[AUTO_CLICKER] Hotkey set to: {}", hotkey);
+    Ok(())
+}
+
+#[tauri::command]
+async fn auto_clicker_get_hotkey() -> Result<String, String> {
+    Ok(get_auto_clicker_hotkey())
+}
+
+#[tauri::command]
+async fn auto_clicker_get_config() -> Result<AutoClickerConfig, String> {
+    Ok(AutoClickerConfig {
+        key: get_auto_clicker_key(),
+        delay_ms: AUTO_CLICKER_DELAY_MS.load(Ordering::SeqCst),
+        enabled: AUTO_CLICKER_ENABLED.load(Ordering::SeqCst),
+        hotkey: get_auto_clicker_hotkey(),
+    })
+}
+
 #[tauri::command]
 async fn simulate_midi_note(
     midi_note: u8,
@@ -3148,6 +3359,7 @@ fn main() {
     load_saved_note_keys();
     load_custom_window_keywords();
     load_saved_keybindings();
+    load_auto_clicker_config();
 
     let app_state = Arc::new(Mutex::new(AppState::new()));
 
@@ -3257,6 +3469,18 @@ fn main() {
             set_live_transpose,
             get_live_transpose,
             simulate_midi_note,
+            // Auto Clicker
+            auto_clicker_start,
+            auto_clicker_stop,
+            auto_clicker_toggle,
+            auto_clicker_set_key,
+            auto_clicker_get_key,
+            auto_clicker_set_delay,
+            auto_clicker_get_delay,
+            auto_clicker_is_enabled,
+            auto_clicker_set_hotkey,
+            auto_clicker_get_hotkey,
+            auto_clicker_get_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

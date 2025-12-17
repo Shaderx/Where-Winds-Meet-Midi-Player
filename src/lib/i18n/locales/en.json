@@ -474,6 +474,15 @@
     "kickPlayer": "Kick player",
     "starting": "Starting..."
   },
+  "autoClicker": {
+    "title": "Auto Clicker",
+    "key": "Key to send",
+    "delay": "Delay between clicks",
+    "hotkey": "Toggle Hotkey",
+    "description": "Automatically sends key presses to the game window at the configured interval.",
+    "enabled": "Auto clicker enabled",
+    "disabled": "Auto clicker disabled"
+  },
   "share": {
     "title": "Library Share",
     "downloaded": "downloaded",

@@ -474,6 +474,15 @@
     "kickPlayer": "플레이어 추방",
     "starting": "시작 중..."
   },
+  "autoClicker": {
+    "title": "자동 클리커",
+    "key": "전송할 키",
+    "delay": "클릭 간격",
+    "hotkey": "토글 단축키",
+    "description": "설정된 간격으로 게임 창에 자동으로 키 입력을 전송합니다.",
+    "enabled": "자동 클리커 활성화됨",
+    "disabled": "자동 클리커 비활성화됨"
+  },
   "share": {
     "title": "라이브러리 공유",
     "downloaded": "다운로드됨",

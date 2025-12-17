@@ -474,6 +474,15 @@
     "kickPlayer": "踢出玩家",
     "starting": "启动中..."
   },
+  "autoClicker": {
+    "title": "自动点击器",
+    "key": "发送按键",
+    "delay": "点击间隔",
+    "hotkey": "切换热键",
+    "description": "按设定的间隔自动向游戏窗口发送按键。",
+    "enabled": "自动点击器已启用",
+    "disabled": "自动点击器已禁用"
+  },
   "share": {
     "title": "曲库分享",
     "downloaded": "已下载",
