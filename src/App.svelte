@@ -220,6 +220,7 @@
   import BandMode from "./lib/components/BandMode.svelte";
   import LibraryShare from "./lib/components/LibraryShare.svelte";
   import AutoClicker from "./lib/components/AutoClicker.svelte";
+  import MacroEditor from "./lib/components/MacroEditor.svelte";
 
   import { bandStatus, connectedPeers, bandSongSelectMode, cancelBandSongSelect, bandSelectedSong } from "./lib/stores/band.js";
   import { libraryConnected, onlinePeers, initLibrary, shareNotification, libraryEnabled } from "./lib/stores/library.js";
@@ -1067,6 +1068,9 @@
 
               <!-- Auto Clicker -->
               <AutoClicker />
+
+              <!-- Custom Macros -->
+              <MacroEditor />
 
               <!-- Update Available -->
               {#if updateAvailable}

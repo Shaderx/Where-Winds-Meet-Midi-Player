@@ -369,6 +369,8 @@ fn char_to_vk(key: &str) -> Option<u32> {
         "," | "comma" => Some(0xBC),
         "." | "period" => Some(0xBE),
         "/" | "slash" => Some(0xBF),
+        // Space key (VK_SPACE = 0x20)
+        " " | "space" | "spacebar" => Some(0x20),
         _ => None,
     }
 }
@@ -606,6 +608,50 @@ pub fn key_down(_key: &str) {
 #[cfg(not(target_os = "windows"))]
 pub fn key_up(_key: &str) {
     // Non-Windows: no-op for now
+}
+
+/// Tap a key in background mode (immediate press+release, same as MIDI playback)
+/// This is the exact same pattern used by MIDI playback for sending notes
+#[cfg(target_os = "windows")]
+pub fn tap_key_background(key: &str) {
+    if let Some((vk, modifier)) = parse_key(key) {
+        if USE_SEND_INPUT.load(Ordering::SeqCst) {
+            // SendInput mode - only works when game is focused
+            if !is_wwm_focused().unwrap_or(false) {
+                return;
+            }
+            if let Some(mod_vk) = modifier_to_vk(modifier) {
+                send_input_combo_down(mod_vk, vk);
+                send_input_combo_up(vk, mod_vk);
+            } else {
+                send_input_key_down(vk);
+                send_input_key_up(vk);
+            }
+        } else {
+            // PostMessage mode - sends to game window regardless of focus
+            if let Some(hwnd) = find_game_window() {
+                unsafe {
+                    if let Some(mod_vk) = modifier_to_vk(modifier) {
+                        // Press modifier + key
+                        let _ = PostMessageW(hwnd, WM_KEYDOWN, WPARAM(mod_vk as usize), make_keydown_lparam(mod_vk));
+                        let _ = PostMessageW(hwnd, WM_KEYDOWN, WPARAM(vk as usize), make_keydown_lparam(vk));
+                        // Release key + modifier
+                        let _ = PostMessageW(hwnd, WM_KEYUP, WPARAM(vk as usize), make_keyup_lparam(vk));
+                        let _ = PostMessageW(hwnd, WM_KEYUP, WPARAM(mod_vk as usize), make_keyup_lparam(mod_vk));
+                    } else {
+                        // Press and release in one go
+                        let _ = PostMessageW(hwnd, WM_KEYDOWN, WPARAM(vk as usize), make_keydown_lparam(vk));
+                        let _ = PostMessageW(hwnd, WM_KEYUP, WPARAM(vk as usize), make_keyup_lparam(vk));
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn tap_key_background(_key: &str) {
+    // Non-Windows: no-op
 }
 
 #[cfg(not(target_os = "windows"))]

@@ -1,0 +1,29 @@
+{
+  "always_on_top": false,
+  "auto_clicker": {
+    "cloud_mode": false,
+    "delay2_ms": 100000,
+    "delay_ms": 2000,
+    "enabled": false,
+    "enabled2": false,
+    "game_window_found": false,
+    "hotkey": "F5",
+    "key": "y",
+    "key2": ""
+  },
+  "keybindings": {
+    "mode_next": "]",
+    "mode_prev": "[",
+    "next": "F11",
+    "pause_resume": "F8",
+    "previous": "F10",
+    "stop": "F12",
+    "toggle_mini": "Insert"
+  },
+  "window_position": {
+    "height": 620,
+    "width": 1180,
+    "x": 1673,
+    "y": -678
+  }
+}

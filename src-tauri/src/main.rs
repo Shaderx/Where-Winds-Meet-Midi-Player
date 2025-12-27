@@ -101,7 +101,20 @@ pub struct AutoClickerConfig {
     pub delay_ms: u64,
     pub enabled: bool,
     pub hotkey: String,
+    #[serde(default)]
+    pub game_window_found: bool,
+    #[serde(default)]
+    pub cloud_mode: bool,
+    // Secondary key configuration
+    #[serde(default)]
+    pub key2: String,
+    #[serde(default = "default_delay2")]
+    pub delay2_ms: u64,
+    #[serde(default)]
+    pub enabled2: bool,
 }
+
+fn default_delay2() -> u64 { 200 }
 
 impl Default for AutoClickerConfig {
     fn default() -> Self {
@@ -110,6 +123,11 @@ impl Default for AutoClickerConfig {
             delay_ms: 100,
             enabled: false,
             hotkey: "F8".to_string(),
+            game_window_found: false,
+            cloud_mode: false,
+            key2: "".to_string(),
+            delay2_ms: 200,
+            enabled2: false,
         }
     }
 }
@@ -120,12 +138,27 @@ static AUTO_CLICKER_DELAY_MS: AtomicU64 = AtomicU64::new(100);
 static AUTO_CLICKER_KEY: RwLock<Option<String>> = RwLock::new(None);
 static AUTO_CLICKER_HOTKEY: RwLock<Option<String>> = RwLock::new(None);
 
+// Secondary key state
+static AUTO_CLICKER_KEY2: RwLock<Option<String>> = RwLock::new(None);
+static AUTO_CLICKER_DELAY2_MS: AtomicU64 = AtomicU64::new(200);
+static AUTO_CLICKER_KEY2_ENABLED: AtomicBool = AtomicBool::new(false);
+
 fn get_auto_clicker_key() -> String {
     AUTO_CLICKER_KEY.read().unwrap().clone().unwrap_or_else(|| "f".to_string())
 }
 
 fn set_auto_clicker_key(key: &str) {
     if let Ok(mut guard) = AUTO_CLICKER_KEY.write() {
+        *guard = Some(key.to_lowercase());
+    }
+}
+
+fn get_auto_clicker_key2() -> String {
+    AUTO_CLICKER_KEY2.read().unwrap().clone().unwrap_or_else(|| "".to_string())
+}
+
+fn set_auto_clicker_key2(key: &str) {
+    if let Ok(mut guard) = AUTO_CLICKER_KEY2.write() {
         *guard = Some(key.to_lowercase());
     }
 }
@@ -147,8 +180,11 @@ fn load_auto_clicker_config() {
             set_auto_clicker_key(&auto_clicker.key);
             AUTO_CLICKER_DELAY_MS.store(auto_clicker.delay_ms, Ordering::SeqCst);
             set_auto_clicker_hotkey_str(&auto_clicker.hotkey);
-            app_log!("[AUTO_CLICKER] Loaded config: key='{}', delay={}ms, hotkey='{}'", 
-                auto_clicker.key, auto_clicker.delay_ms, auto_clicker.hotkey);
+            // Load secondary key config
+            set_auto_clicker_key2(&auto_clicker.key2);
+            AUTO_CLICKER_DELAY2_MS.store(auto_clicker.delay2_ms, Ordering::SeqCst);
+            app_log!("[AUTO_CLICKER] Loaded config: key='{}', delay={}ms, key2='{}', delay2={}ms, hotkey='{}'", 
+                auto_clicker.key, auto_clicker.delay_ms, auto_clicker.key2, auto_clicker.delay2_ms, auto_clicker.hotkey);
         }
     }
 }
@@ -159,14 +195,20 @@ fn save_auto_clicker_config() {
         delay_ms: AUTO_CLICKER_DELAY_MS.load(Ordering::SeqCst),
         enabled: false, // Don't persist enabled state
         hotkey: get_auto_clicker_hotkey(),
+        game_window_found: false, // Runtime status, not persisted
+        cloud_mode: false, // Runtime status, not persisted
+        key2: get_auto_clicker_key2(),
+        delay2_ms: AUTO_CLICKER_DELAY2_MS.load(Ordering::SeqCst),
+        enabled2: false, // Don't persist enabled state
     };
     let mut config = load_config();
     config["auto_clicker"] = serde_json::to_value(&config_data).unwrap_or_default();
     save_config(&config);
 }
 
-// Auto clicker thread handle
+// Auto clicker thread handles
 static AUTO_CLICKER_THREAD_RUNNING: AtomicBool = AtomicBool::new(false);
+static AUTO_CLICKER_THREAD2_RUNNING: AtomicBool = AtomicBool::new(false);
 
 fn start_auto_clicker_thread() {
     // Don't start if already running
@@ -175,23 +217,80 @@ fn start_auto_clicker_thread() {
     }
 
     thread::spawn(move || {
-        app_log!("[AUTO_CLICKER] Thread started");
+        // Check if game window exists (uses PostMessage for background sending)
+        let game_found = keyboard::is_game_window_found();
+        let cloud_mode = keyboard::get_send_input_mode();
         
+        if cloud_mode {
+            app_log!("[AUTO_CLICKER] Thread started (Cloud Gaming Mode - requires focus)");
+        } else if game_found {
+            app_log!("[AUTO_CLICKER] Thread started (Background Mode - PostMessage to game window)");
+        } else {
+            app_log!("[AUTO_CLICKER] Thread started (WARNING: Game window not found yet)");
+        }
+
+        let mut last_window_check = std::time::Instant::now();
+        let window_check_interval = std::time::Duration::from_secs(5);
+
         while AUTO_CLICKER_ENABLED.load(Ordering::SeqCst) {
             let key = get_auto_clicker_key();
             let delay = AUTO_CLICKER_DELAY_MS.load(Ordering::SeqCst);
-            
-            // Send key press using background key send (same as MIDI playback)
-            keyboard::key_down(&key);
-            thread::sleep(std::time::Duration::from_millis(30));
-            keyboard::key_up(&key);
-            
+
+            // Periodically log window status for debugging
+            if last_window_check.elapsed() > window_check_interval {
+                let found = keyboard::is_game_window_found();
+                let cloud = keyboard::get_send_input_mode();
+                app_log!("[AUTO_CLICKER] Status: key='{}', delay={}ms, window_found={}, cloud_mode={}", 
+                    key, delay, found, cloud);
+                last_window_check = std::time::Instant::now();
+            }
+
+            // Send key press using the SAME method as MIDI playback
+            // Use tap_key_background which sends directly to game window via PostMessage
+            keyboard::tap_key_background(&key);
+
             // Wait for the configured delay
             thread::sleep(std::time::Duration::from_millis(delay));
         }
-        
+
         AUTO_CLICKER_THREAD_RUNNING.store(false, Ordering::SeqCst);
         app_log!("[AUTO_CLICKER] Thread stopped");
+    });
+}
+
+fn start_auto_clicker_thread2() {
+    // Don't start if already running or if key2 is empty
+    let key2 = get_auto_clicker_key2();
+    if key2.is_empty() {
+        return;
+    }
+    
+    if AUTO_CLICKER_THREAD2_RUNNING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+
+    thread::spawn(move || {
+        app_log!("[AUTO_CLICKER2] Secondary key thread started");
+
+        while AUTO_CLICKER_ENABLED.load(Ordering::SeqCst) && AUTO_CLICKER_KEY2_ENABLED.load(Ordering::SeqCst) {
+            let key2 = get_auto_clicker_key2();
+            let delay2 = AUTO_CLICKER_DELAY2_MS.load(Ordering::SeqCst);
+
+            // Skip if key2 is empty
+            if key2.is_empty() {
+                thread::sleep(std::time::Duration::from_millis(100));
+                continue;
+            }
+
+            // Send key press
+            keyboard::tap_key_background(&key2);
+
+            // Wait for the configured delay
+            thread::sleep(std::time::Duration::from_millis(delay2));
+        }
+
+        AUTO_CLICKER_THREAD2_RUNNING.store(false, Ordering::SeqCst);
+        app_log!("[AUTO_CLICKER2] Secondary key thread stopped");
     });
 }
 
@@ -202,6 +301,10 @@ fn toggle_auto_clicker() -> bool {
     
     if new_state {
         start_auto_clicker_thread();
+        // Also start secondary key thread if enabled
+        if AUTO_CLICKER_KEY2_ENABLED.load(Ordering::SeqCst) {
+            start_auto_clicker_thread2();
+        }
     }
     
     app_log!("[AUTO_CLICKER] Toggled: {} -> {}", was_enabled, new_state);
@@ -3285,6 +3388,47 @@ async fn auto_clicker_get_hotkey() -> Result<String, String> {
     Ok(get_auto_clicker_hotkey())
 }
 
+// Secondary key commands
+#[tauri::command]
+async fn auto_clicker_set_key2(key: String) -> Result<(), String> {
+    set_auto_clicker_key2(&key);
+    save_auto_clicker_config();
+    app_log!("[AUTO_CLICKER] Key2 set to: {}", key);
+    Ok(())
+}
+
+#[tauri::command]
+async fn auto_clicker_get_key2() -> Result<String, String> {
+    Ok(get_auto_clicker_key2())
+}
+
+#[tauri::command]
+async fn auto_clicker_set_delay2(delay_ms: u64) -> Result<(), String> {
+    let clamped = delay_ms.max(10).min(5000); // Min 10ms, max 5000ms
+    AUTO_CLICKER_DELAY2_MS.store(clamped, Ordering::SeqCst);
+    save_auto_clicker_config();
+    app_log!("[AUTO_CLICKER] Delay2 set to: {}ms", clamped);
+    Ok(())
+}
+
+#[tauri::command]
+async fn auto_clicker_get_delay2() -> Result<u64, String> {
+    Ok(AUTO_CLICKER_DELAY2_MS.load(Ordering::SeqCst))
+}
+
+#[tauri::command]
+async fn auto_clicker_set_key2_enabled(enabled: bool) -> Result<(), String> {
+    AUTO_CLICKER_KEY2_ENABLED.store(enabled, Ordering::SeqCst);
+    
+    // If auto clicker is running and we're enabling key2, start the thread
+    if enabled && AUTO_CLICKER_ENABLED.load(Ordering::SeqCst) {
+        start_auto_clicker_thread2();
+    }
+    
+    app_log!("[AUTO_CLICKER] Key2 enabled: {}", enabled);
+    Ok(())
+}
+
 #[tauri::command]
 async fn auto_clicker_get_config() -> Result<AutoClickerConfig, String> {
     Ok(AutoClickerConfig {
@@ -3292,7 +3436,342 @@ async fn auto_clicker_get_config() -> Result<AutoClickerConfig, String> {
         delay_ms: AUTO_CLICKER_DELAY_MS.load(Ordering::SeqCst),
         enabled: AUTO_CLICKER_ENABLED.load(Ordering::SeqCst),
         hotkey: get_auto_clicker_hotkey(),
+        game_window_found: keyboard::is_game_window_found(),
+        cloud_mode: keyboard::get_send_input_mode(),
+        key2: get_auto_clicker_key2(),
+        delay2_ms: AUTO_CLICKER_DELAY2_MS.load(Ordering::SeqCst),
+        enabled2: AUTO_CLICKER_KEY2_ENABLED.load(Ordering::SeqCst),
     })
+}
+
+// ============ Custom Macros ============
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomMacro {
+    pub id: String,
+    pub name: String,
+    pub script: String,
+    pub hotkey: String,
+    #[serde(default)]
+    pub enabled: bool,
+}
+
+// Macro action parsed from script
+#[derive(Debug, Clone)]
+enum MacroAction {
+    Key(String),           // Tap a key
+    Hold(String, u64),     // Hold key for duration ms
+    Wait(u64),             // Wait for duration ms
+    Repeat(u32, Vec<MacroAction>), // Repeat actions n times
+}
+
+// Global macro state
+static MACROS: RwLock<Vec<CustomMacro>> = RwLock::new(Vec::new());
+static MACRO_RUNNING: AtomicBool = AtomicBool::new(false);
+static MACRO_STOP_FLAG: AtomicBool = AtomicBool::new(false);
+
+fn get_macros() -> Vec<CustomMacro> {
+    MACROS.read().map(|g| g.clone()).unwrap_or_default()
+}
+
+fn set_macros(macros: Vec<CustomMacro>) {
+    if let Ok(mut guard) = MACROS.write() {
+        *guard = macros;
+    }
+}
+
+fn load_macros_from_config() {
+    let config = load_config();
+    if let Some(macros_val) = config.get("macros") {
+        if let Ok(macros) = serde_json::from_value::<Vec<CustomMacro>>(macros_val.clone()) {
+            set_macros(macros.clone());
+            app_log!("[MACROS] Loaded {} macros from config", macros.len());
+        }
+    }
+}
+
+fn save_macros_to_config() {
+    let macros = get_macros();
+    let mut config = load_config();
+    config["macros"] = serde_json::to_value(&macros).unwrap_or_default();
+    save_config(&config);
+    app_log!("[MACROS] Saved {} macros to config", macros.len());
+}
+
+// Parse macro script into actions
+fn parse_macro_script(script: &str) -> Result<Vec<MacroAction>, String> {
+    let mut actions = Vec::new();
+    let lines: Vec<&str> = script.lines().collect();
+    let mut i = 0;
+    
+    while i < lines.len() {
+        let line = lines[i].trim();
+        
+        // Skip empty lines and comments
+        if line.is_empty() || line.starts_with('#') || line.starts_with("//") {
+            i += 1;
+            continue;
+        }
+        
+        // Parse the action
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.is_empty() {
+            i += 1;
+            continue;
+        }
+        
+        match parts[0].to_lowercase().as_str() {
+            "key" | "press" | "tap" => {
+                if parts.len() < 2 {
+                    return Err(format!("Line {}: 'key' requires a key name", i + 1));
+                }
+                actions.push(MacroAction::Key(parts[1].to_string()));
+            }
+            "hold" => {
+                if parts.len() < 3 {
+                    return Err(format!("Line {}: 'hold' requires key and duration (ms)", i + 1));
+                }
+                let duration: u64 = parts[2].parse()
+                    .map_err(|_| format!("Line {}: invalid duration '{}'", i + 1, parts[2]))?;
+                actions.push(MacroAction::Hold(parts[1].to_string(), duration));
+            }
+            "wait" | "delay" | "sleep" => {
+                if parts.len() < 2 {
+                    return Err(format!("Line {}: 'wait' requires duration (ms)", i + 1));
+                }
+                let duration: u64 = parts[1].parse()
+                    .map_err(|_| format!("Line {}: invalid duration '{}'", i + 1, parts[1]))?;
+                actions.push(MacroAction::Wait(duration));
+            }
+            "repeat" | "loop" => {
+                if parts.len() < 2 {
+                    return Err(format!("Line {}: 'repeat' requires count", i + 1));
+                }
+                let count: u32 = parts[1].parse()
+                    .map_err(|_| format!("Line {}: invalid count '{}'", i + 1, parts[1]))?;
+                
+                // Check for opening brace
+                let has_brace = line.contains('{');
+                if !has_brace {
+                    return Err(format!("Line {}: 'repeat' requires opening brace '{{' ", i + 1));
+                }
+                
+                // Find matching closing brace
+                let mut brace_count = 1;
+                let mut block_lines = Vec::new();
+                i += 1;
+                
+                while i < lines.len() && brace_count > 0 {
+                    let block_line = lines[i].trim();
+                    if block_line.contains('{') {
+                        brace_count += block_line.matches('{').count();
+                    }
+                    if block_line.contains('}') {
+                        brace_count -= block_line.matches('}').count();
+                    }
+                    if brace_count > 0 {
+                        block_lines.push(block_line);
+                    }
+                    i += 1;
+                }
+                
+                if brace_count != 0 {
+                    return Err(format!("Unmatched braces in repeat block"));
+                }
+                
+                // Parse the block recursively
+                let block_script = block_lines.join("\n");
+                let block_actions = parse_macro_script(&block_script)?;
+                actions.push(MacroAction::Repeat(count, block_actions));
+                continue; // i was already advanced in the while loop
+            }
+            _ => {
+                // Unknown command - treat as key tap if it's a single word
+                if parts.len() == 1 && parts[0].len() <= 3 {
+                    actions.push(MacroAction::Key(parts[0].to_string()));
+                } else {
+                    return Err(format!("Line {}: unknown command '{}'", i + 1, parts[0]));
+                }
+            }
+        }
+        
+        i += 1;
+    }
+    
+    Ok(actions)
+}
+
+// Execute macro actions
+fn execute_macro_actions(actions: &[MacroAction]) {
+    for action in actions {
+        // Check stop flag
+        if MACRO_STOP_FLAG.load(Ordering::SeqCst) {
+            break;
+        }
+        
+        match action {
+            MacroAction::Key(key) => {
+                keyboard::tap_key_background(key);
+            }
+            MacroAction::Hold(key, duration) => {
+                keyboard::key_down(key);
+                thread::sleep(std::time::Duration::from_millis(*duration));
+                keyboard::key_up(key);
+            }
+            MacroAction::Wait(duration) => {
+                // Break wait into smaller chunks to check stop flag
+                let chunks = (*duration / 50).max(1);
+                let chunk_duration = *duration / chunks;
+                for _ in 0..chunks {
+                    if MACRO_STOP_FLAG.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    thread::sleep(std::time::Duration::from_millis(chunk_duration));
+                }
+            }
+            MacroAction::Repeat(count, block_actions) => {
+                for _ in 0..*count {
+                    if MACRO_STOP_FLAG.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    execute_macro_actions(block_actions);
+                }
+            }
+        }
+    }
+}
+
+// Run a macro by ID
+fn run_macro(id: &str, app_handle: &AppHandle) -> Result<(), String> {
+    let macros = get_macros();
+    let macro_def = macros.iter().find(|m| m.id == id)
+        .ok_or_else(|| format!("Macro '{}' not found", id))?;
+    
+    // Parse script
+    let actions = parse_macro_script(&macro_def.script)?;
+    
+    if actions.is_empty() {
+        return Err("Macro script is empty".to_string());
+    }
+    
+    // Check if already running
+    if MACRO_RUNNING.swap(true, Ordering::SeqCst) {
+        return Err("Another macro is already running".to_string());
+    }
+    
+    MACRO_STOP_FLAG.store(false, Ordering::SeqCst);
+    
+    let macro_name = macro_def.name.clone();
+    let macro_id = id.to_string();
+    let handle = app_handle.clone();
+    
+    thread::spawn(move || {
+        app_log!("[MACRO] Starting: {}", macro_name);
+        let _ = handle.emit("macro-started", &macro_id);
+        
+        execute_macro_actions(&actions);
+        
+        MACRO_RUNNING.store(false, Ordering::SeqCst);
+        app_log!("[MACRO] Finished: {}", macro_name);
+        let _ = handle.emit("macro-stopped", &macro_id);
+    });
+    
+    Ok(())
+}
+
+fn stop_macro() {
+    MACRO_STOP_FLAG.store(true, Ordering::SeqCst);
+}
+
+// Tauri commands for macros
+#[tauri::command]
+async fn macro_list() -> Result<Vec<CustomMacro>, String> {
+    Ok(get_macros())
+}
+
+#[tauri::command]
+async fn macro_create(name: String, script: String, hotkey: String) -> Result<CustomMacro, String> {
+    // Validate script
+    parse_macro_script(&script)?;
+    
+    let new_macro = CustomMacro {
+        id: format!("macro_{}", std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()),
+        name,
+        script,
+        hotkey,
+        enabled: true,
+    };
+    
+    let mut macros = get_macros();
+    macros.push(new_macro.clone());
+    set_macros(macros);
+    save_macros_to_config();
+    
+    app_log!("[MACRO] Created: {}", new_macro.name);
+    Ok(new_macro)
+}
+
+#[tauri::command]
+async fn macro_update(id: String, name: String, script: String, hotkey: String) -> Result<CustomMacro, String> {
+    // Validate script
+    parse_macro_script(&script)?;
+    
+    let mut macros = get_macros();
+    let macro_idx = macros.iter().position(|m| m.id == id)
+        .ok_or_else(|| format!("Macro '{}' not found", id))?;
+    
+    macros[macro_idx].name = name;
+    macros[macro_idx].script = script;
+    macros[macro_idx].hotkey = hotkey;
+    
+    let updated = macros[macro_idx].clone();
+    set_macros(macros);
+    save_macros_to_config();
+    
+    app_log!("[MACRO] Updated: {}", updated.name);
+    Ok(updated)
+}
+
+#[tauri::command]
+async fn macro_delete(id: String) -> Result<(), String> {
+    let mut macros = get_macros();
+    let initial_len = macros.len();
+    macros.retain(|m| m.id != id);
+    
+    if macros.len() == initial_len {
+        return Err(format!("Macro '{}' not found", id));
+    }
+    
+    set_macros(macros);
+    save_macros_to_config();
+    
+    app_log!("[MACRO] Deleted: {}", id);
+    Ok(())
+}
+
+#[tauri::command]
+async fn macro_run(id: String, app_handle: AppHandle) -> Result<(), String> {
+    run_macro(&id, &app_handle)
+}
+
+#[tauri::command]
+async fn macro_stop() -> Result<(), String> {
+    stop_macro();
+    Ok(())
+}
+
+#[tauri::command]
+async fn macro_is_running() -> Result<bool, String> {
+    Ok(MACRO_RUNNING.load(Ordering::SeqCst))
+}
+
+#[tauri::command]
+async fn macro_validate(script: String) -> Result<usize, String> {
+    let actions = parse_macro_script(&script)?;
+    Ok(actions.len())
 }
 
 #[tauri::command]
@@ -3360,6 +3839,7 @@ fn main() {
     load_custom_window_keywords();
     load_saved_keybindings();
     load_auto_clicker_config();
+    load_macros_from_config();
 
     let app_state = Arc::new(Mutex::new(AppState::new()));
 
@@ -3480,7 +3960,21 @@ fn main() {
             auto_clicker_is_enabled,
             auto_clicker_set_hotkey,
             auto_clicker_get_hotkey,
+            auto_clicker_set_key2,
+            auto_clicker_get_key2,
+            auto_clicker_set_delay2,
+            auto_clicker_get_delay2,
+            auto_clicker_set_key2_enabled,
             auto_clicker_get_config,
+            // Custom Macros
+            macro_list,
+            macro_create,
+            macro_update,
+            macro_delete,
+            macro_run,
+            macro_stop,
+            macro_is_running,
+            macro_validate,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

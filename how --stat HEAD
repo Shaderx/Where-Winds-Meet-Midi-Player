@@ -1,0 +1,24 @@
+[1mdiff --git a/src-tauri/src/midi_input.rs b/src-tauri/src/midi_input.rs[m
+[1mindex 4c4333b..532892d 100644[m
+[1m--- a/src-tauri/src/midi_input.rs[m
+[1m+++ b/src-tauri/src/midi_input.rs[m
+[36m@@ -236,16 +236,15 @@[m [mfn handle_midi_message([m
+ [m
+     if is_note_on {[m
+         // Get current settings[m
+[31m-        let current_note_mode = NoteMode::from(note_mode.load(Ordering::SeqCst));[m
+         let current_key_mode = KeyMode::from(key_mode.load(Ordering::SeqCst));[m
+         let current_octave_shift = octave_shift.load(Ordering::SeqCst) as i32;[m
+         let current_transpose = transpose.load(Ordering::SeqCst) as i32;[m
+ [m
+[31m-        // Calculate total transpose[m
+[32m+[m[32m        // Calculate total transpose (octave shift only)[m
+         let total_transpose = current_transpose + (current_octave_shift * 12);[m
+ [m
+[31m-        // Map note to key using same logic as midi.rs[m
+[31m-        let key = map_note_to_key(note as i32, total_transpose, current_note_mode, current_key_mode);[m
+[32m+[m[32m        // Live input: use direct chromatic mapping (Closest mode), bypass note_mode[m
+[32m+[m[32m        let key = map_note_to_key(note as i32, total_transpose, NoteMode::Closest, current_key_mode);[m
+ [m
+         // Press the key[m
+         keyboard::key_down(&key);[m
