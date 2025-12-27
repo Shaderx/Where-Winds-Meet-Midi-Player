@@ -77,6 +77,7 @@
   "common": {
     "apply": "Apply",
     "cancel": "Cancel",
+    "clear": "Clear",
     "close": "Close",
     "confirm": "Confirm",
     "create": "Create",
@@ -88,6 +89,7 @@
     "off": "OFF",
     "on": "ON",
     "save": "Save",
+    "stop": "Stop",
     "supportOnKofi": "Support on Ko-fi"
   },
   "contextMenu": {
@@ -201,6 +203,29 @@
     "title": "Live Play",
     "virtualKeyboard": "Virtual MIDI Keyboard",
     "waitingForInput": "Waiting for input..."
+  },
+  "macro": {
+    "actions": "actions",
+    "clickToSet": "Click to set",
+    "create": "Create Macro",
+    "createFirst": "Create your first macro",
+    "description": "Create custom key sequences to automate actions in-game.",
+    "edit": "Edit Macro",
+    "help": "Help",
+    "hotkey": "Hotkey",
+    "name": "Name",
+    "noMacros": "No macros yet",
+    "optional": "optional",
+    "run": "Run",
+    "running": "Macro running...",
+    "script": "Script",
+    "syntax": "Macro Syntax",
+    "syntaxHold": "Hold key for 500ms",
+    "syntaxKey": "Tap a key",
+    "syntaxNote": "Lines starting with # are comments",
+    "syntaxRepeat": "Repeat 3 times",
+    "syntaxWait": "Wait 100ms",
+    "title": "Macros"
   },
   "modals": {
     "closeApp": {

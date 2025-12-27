@@ -1,14 +1,4 @@
-2025-12-24T06:25:47.5988531Z [INFO] === WWM Overlay Started ===
-2025-12-24T06:25:47.5996647Z [INFO] Loaded custom keybindings
-2025-12-24T06:25:47.5997606Z [INFO] [AUTO_CLICKER] Loaded config: key='y', delay=2000ms, key2='', delay2=100000ms, hotkey='F5'
-2025-12-24T06:25:48.0819914Z [INFO] [KEYBINDINGS] Reloaded: pause=77 stop=7B prev=79 next=7A auto_clicker=74
-2025-12-24T12:48:00.6393597Z [WARN] NewEvents emitted without explicit RedrawEventsCleared
-2025-12-24T12:48:00.6423798Z [WARN] RedrawEventsCleared emitted without explicit MainEventsCleared
-2025-12-24T14:18:32.0633618Z [WARN] NewEvents emitted without explicit RedrawEventsCleared
-2025-12-24T14:18:32.0671729Z [WARN] RedrawEventsCleared emitted without explicit MainEventsCleared
-2025-12-24T17:49:27.6266466Z [WARN] NewEvents emitted without explicit RedrawEventsCleared
-2025-12-24T17:49:27.6292744Z [WARN] RedrawEventsCleared emitted without explicit MainEventsCleared
-2025-12-24T18:28:59.4789697Z [WARN] NewEvents emitted without explicit RedrawEventsCleared
-2025-12-24T18:28:59.4823227Z [WARN] RedrawEventsCleared emitted without explicit MainEventsCleared
-2025-12-24T19:00:09.9025401Z [WARN] NewEvents emitted without explicit RedrawEventsCleared
-2025-12-24T19:00:09.9047047Z [WARN] RedrawEventsCleared emitted without explicit MainEventsCleared
+2025-12-27T07:50:45.1226911Z [INFO] === WWM Overlay Started ===
+2025-12-27T07:50:45.1232715Z [INFO] Loaded custom keybindings
+2025-12-27T07:50:45.1233735Z [INFO] [AUTO_CLICKER] Loaded config: key='y', delay=2000ms, key2='', delay2=100000ms, hotkey='F5'
+2025-12-27T07:50:45.5299672Z [INFO] [KEYBINDINGS] Reloaded: pause=77 stop=7B prev=79 next=7A auto_clicker=74

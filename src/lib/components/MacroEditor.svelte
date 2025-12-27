@@ -256,6 +256,7 @@
               <p class="text-white/60"><code class="text-purple-300">hold f 500</code> - {$t("macro.syntaxHold")}</p>
               <p class="text-white/60"><code class="text-purple-300">wait 100</code> - {$t("macro.syntaxWait")}</p>
               <p class="text-white/60"><code class="text-purple-300">repeat 3 {'{'}...{'}'}</code> - {$t("macro.syntaxRepeat")}</p>
+              <p class="text-white/60"><code class="text-purple-300">loop {'{'}...{'}'}</code> - {$t("macro.syntaxLoop")}</p>
               <p class="text-white/40 mt-1">{$t("macro.syntaxNote")}</p>
             </div>
           {/if}
@@ -421,4 +422,5 @@
     </div>
   {/if}
 </div>
+
 

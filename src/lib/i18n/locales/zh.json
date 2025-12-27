@@ -507,6 +507,7 @@
     "syntaxHold": "按住键500毫秒",
     "syntaxWait": "等待100毫秒",
     "syntaxRepeat": "重复3次",
+    "syntaxLoop": "无限循环（直到停止）",
     "syntaxNote": "以#开头的行是注释"
   },
   "share": {

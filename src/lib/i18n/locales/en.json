@@ -509,6 +509,7 @@
     "syntaxHold": "Hold key for 500ms",
     "syntaxWait": "Wait 100ms",
     "syntaxRepeat": "Repeat 3 times",
+    "syntaxLoop": "Loop forever (until stopped)",
     "syntaxNote": "Lines starting with # are comments"
   },
   "share": {

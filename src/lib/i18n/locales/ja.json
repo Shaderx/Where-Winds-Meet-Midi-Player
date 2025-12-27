@@ -507,6 +507,7 @@
     "syntaxHold": "キーを500ms押し続ける",
     "syntaxWait": "100ms待機",
     "syntaxRepeat": "3回繰り返す",
+    "syntaxLoop": "永久ループ（停止まで）",
     "syntaxNote": "#で始まる行はコメントです"
   },
   "share": {

@@ -507,6 +507,7 @@
     "syntaxHold": "키를 500ms 동안 누르기",
     "syntaxWait": "100ms 대기",
     "syntaxRepeat": "3회 반복",
+    "syntaxLoop": "무한 반복 (정지할 때까지)",
     "syntaxNote": "#로 시작하는 줄은 주석입니다"
   },
   "share": {

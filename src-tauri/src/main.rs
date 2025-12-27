@@ -2237,7 +2237,7 @@ struct UpdateInfo {
 async fn check_for_update(current_version: String) -> Result<Option<UpdateInfo>, String> {
     use std::io::Read;
 
-    let response = ureq::get("https://api.github.com/repos/SnowiyQ/Where-Winds-Meet-Midi-Player/releases/latest")
+    let response = ureq::get("https://api.github.com/repos/shaderx/Where-Winds-Meet-Midi-Player/releases/latest")
         .set("User-Agent", "WWM-Overlay")
         .call()
         .map_err(|e| format!("Failed to check for updates: {}", e))?;
@@ -3463,6 +3463,7 @@ enum MacroAction {
     Hold(String, u64),     // Hold key for duration ms
     Wait(u64),             // Wait for duration ms
     Repeat(u32, Vec<MacroAction>), // Repeat actions n times
+    Loop(Vec<MacroAction>), // Loop forever until stopped
 }
 
 // Global macro state
@@ -3543,7 +3544,7 @@ fn parse_macro_script(script: &str) -> Result<Vec<MacroAction>, String> {
                     .map_err(|_| format!("Line {}: invalid duration '{}'", i + 1, parts[1]))?;
                 actions.push(MacroAction::Wait(duration));
             }
-            "repeat" | "loop" => {
+            "repeat" => {
                 if parts.len() < 2 {
                     return Err(format!("Line {}: 'repeat' requires count", i + 1));
                 }
@@ -3583,6 +3584,43 @@ fn parse_macro_script(script: &str) -> Result<Vec<MacroAction>, String> {
                 let block_script = block_lines.join("\n");
                 let block_actions = parse_macro_script(&block_script)?;
                 actions.push(MacroAction::Repeat(count, block_actions));
+                continue; // i was already advanced in the while loop
+            }
+            "loop" | "forever" => {
+                // Infinite loop - runs until stopped
+                // Check for opening brace
+                let has_brace = line.contains('{');
+                if !has_brace {
+                    return Err(format!("Line {}: 'loop' requires opening brace '{{' ", i + 1));
+                }
+                
+                // Find matching closing brace
+                let mut brace_count = 1;
+                let mut block_lines = Vec::new();
+                i += 1;
+                
+                while i < lines.len() && brace_count > 0 {
+                    let block_line = lines[i].trim();
+                    if block_line.contains('{') {
+                        brace_count += block_line.matches('{').count();
+                    }
+                    if block_line.contains('}') {
+                        brace_count -= block_line.matches('}').count();
+                    }
+                    if brace_count > 0 {
+                        block_lines.push(block_line);
+                    }
+                    i += 1;
+                }
+                
+                if brace_count != 0 {
+                    return Err(format!("Unmatched braces in loop block"));
+                }
+                
+                // Parse the block recursively
+                let block_script = block_lines.join("\n");
+                let block_actions = parse_macro_script(&block_script)?;
+                actions.push(MacroAction::Loop(block_actions));
                 continue; // i was already advanced in the while loop
             }
             _ => {
@@ -3631,6 +3669,15 @@ fn execute_macro_actions(actions: &[MacroAction]) {
             }
             MacroAction::Repeat(count, block_actions) => {
                 for _ in 0..*count {
+                    if MACRO_STOP_FLAG.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    execute_macro_actions(block_actions);
+                }
+            }
+            MacroAction::Loop(block_actions) => {
+                // Infinite loop - runs until MACRO_STOP_FLAG is set
+                loop {
                     if MACRO_STOP_FLAG.load(Ordering::SeqCst) {
                         break;
                     }
