@@ -2237,7 +2237,7 @@ struct UpdateInfo {
 async fn check_for_update(current_version: String) -> Result<Option<UpdateInfo>, String> {
     use std::io::Read;
 
-    let response = ureq::get("https://api.github.com/repos/shaderx/Where-Winds-Meet-Midi-Player/releases/latest")
+    let response = ureq::get("https://api.github.com/repos/Shaderx/Where-Winds-Meet-Midi-Player/releases")
         .set("User-Agent", "WWM-Overlay")
         .call()
         .map_err(|e| format!("Failed to check for updates: {}", e))?;
@@ -2251,11 +2251,69 @@ async fn check_for_update(current_version: String) -> Result<Option<UpdateInfo>,
     let json: serde_json::Value = serde_json::from_str(&body)
         .map_err(|e| e.to_string())?;
 
-    let latest_version = json["tag_name"]
-        .as_str()
-        .unwrap_or("")
-        .trim_start_matches('v')
-        .to_string();
+    // Get all releases, find the highest relevant version (including those with - suffixes)
+    let releases = json.as_array().ok_or("Unexpected update response format")?;
+
+    // Helper function to compare version strings
+    fn version_is_newer(candidate: &str, current: &str) -> bool {
+        // This is similar to semantic versioning, but with possible -c/-b etc. suffixes for sub-branches.
+        // "1.2.3-c" > "1.2.3", "1.2.3-b" > "1.2.3", "1.2.4" > "1.2.3"
+        // "1.2.3" < "1.2.3-c"
+        let candidate_parts: Vec<&str> = candidate.splitn(2, '-').collect();
+        let current_parts: Vec<&str> = current.splitn(2, '-').collect();
+
+        let candidate_base = candidate_parts[0];
+        let current_base = current_parts[0];
+
+        let base_cmp = {
+            let can: Vec<u32> = candidate_base.split('.').filter_map(|n| n.parse().ok()).collect();
+            let cur: Vec<u32> = current_base.split('.').filter_map(|n| n.parse().ok()).collect();
+            let mut found_diff = false;
+            for (a, b) in can.iter().zip(cur.iter()) {
+                if a > b {
+                    found_diff = true;
+                    break;
+                }
+                if a < b {
+                    return false;
+                }
+            }
+            found_diff || (can.len() > cur.len() && can.iter().zip(cur.iter()).all(|(a, b)| a == b))
+        };
+
+        // If base version is higher, it's obviously newer.
+        if base_cmp {
+            return true;
+        }
+        // Same base version, but candidate has a suffix and current does not: suffix is "later"
+        if candidate_base == current_base {
+            let current_suffix = current_parts.get(1);
+            let candidate_suffix = candidate_parts.get(1);
+            match (candidate_suffix, current_suffix) {
+                (Some(_), None) => true,
+                (Some(ca), Some(cu)) => ca > cu, // alphabetically later suffix (e.g. d > c)
+                _ => false
+            }
+        } else {
+            false
+        }
+    }
+
+    // Find the latest version whose version_is_newer is true
+    let mut latest_version = String::new();
+    let mut latest_release = None;
+    for release in releases {
+        if let Some(tag) = release.get("tag_name").and_then(|v| v.as_str()) {
+            let tag = tag.trim_start_matches('v');
+            if version_is_newer(tag, &current_version) && version_is_newer(tag, &latest_version) {
+                latest_version = tag.to_string();
+                latest_release = Some(release);
+            }
+        }
+    }
+
+    // Use latest_release for details in the rest of the function
+    let json = latest_release.cloned().unwrap_or(serde_json::json!({}));
 
     if latest_version.is_empty() {
         return Ok(None);
