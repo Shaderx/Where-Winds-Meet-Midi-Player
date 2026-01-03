@@ -1,6 +1,6 @@
 [package]
 name = "wwm-overlay"
-version = "1.2.0"
+version = "1.2.1"
 description = "MIDI Player Overlay for Where Wind Meets (Global)"
 authors = ["you"]
 edition = "2021"
