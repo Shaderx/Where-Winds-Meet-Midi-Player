@@ -1,4 +1,50 @@
-2025-12-27T07:50:45.1226911Z [INFO] === WWM Overlay Started ===
-2025-12-27T07:50:45.1232715Z [INFO] Loaded custom keybindings
-2025-12-27T07:50:45.1233735Z [INFO] [AUTO_CLICKER] Loaded config: key='y', delay=2000ms, key2='', delay2=100000ms, hotkey='F5'
-2025-12-27T07:50:45.5299672Z [INFO] [KEYBINDINGS] Reloaded: pause=77 stop=7B prev=79 next=7A auto_clicker=74
+2026-01-03T17:48:05.6384267Z [INFO] === WWM Overlay Started ===
+2026-01-03T17:48:05.6392684Z [INFO] Loaded custom keybindings
+2026-01-03T17:48:05.6393692Z [INFO] [AUTO_CLICKER] Loaded config: key='y', delay=2000ms, key2='', delay2=100000ms, hotkey='F5'
+2026-01-03T17:48:06.0496559Z [INFO] [KEYBINDINGS] Reloaded: pause=77 stop=7B prev=79 next=7A auto_clicker=74
+2026-01-03T17:54:55.3018674Z [WARN] NewEvents emitted without explicit RedrawEventsCleared
+2026-01-03T17:54:55.3042085Z [WARN] RedrawEventsCleared emitted without explicit MainEventsCleared
+2026-01-03T17:54:55.382173Z [INFO] [MACROS] Saved 1 macros to config
+2026-01-03T17:54:55.3822243Z [INFO] [MACRO] Created: Farm
+2026-01-03T17:55:43.8278335Z [WARN] NewEvents emitted without explicit RedrawEventsCleared
+2026-01-03T17:55:43.8299701Z [WARN] RedrawEventsCleared emitted without explicit MainEventsCleared
+2026-01-03T17:55:43.9058112Z [INFO] [MACROS] Saved 1 macros to config
+2026-01-03T17:55:43.905862Z [INFO] [MACRO] Updated: Farm
+2026-01-03T17:56:03.3203717Z [INFO] [AUTO_CLICKER] Hotkey VK cached: 74
+2026-01-03T17:56:03.3204333Z [INFO] [AUTO_CLICKER] Hotkey set to: F5
+2026-01-03T17:56:04.1114895Z [WARN] NewEvents emitted without explicit RedrawEventsCleared
+2026-01-03T17:56:04.1133847Z [WARN] RedrawEventsCleared emitted without explicit MainEventsCleared
+2026-01-03T17:56:06.7160278Z [INFO] [AUTO_CLICKER] Hotkey VK cached: 7B
+2026-01-03T17:56:06.7160892Z [INFO] [AUTO_CLICKER] Hotkey set to: F12
+2026-01-03T17:56:08.1852112Z [WARN] NewEvents emitted without explicit RedrawEventsCleared
+2026-01-03T17:56:08.1875747Z [WARN] RedrawEventsCleared emitted without explicit MainEventsCleared
+2026-01-03T17:56:10.5648405Z [INFO] [AUTO_CLICKER] Hotkey VK cached: DB
+2026-01-03T17:56:10.5648835Z [INFO] [AUTO_CLICKER] Hotkey set to: [
+2026-01-03T17:56:11.8713219Z [WARN] NewEvents emitted without explicit RedrawEventsCleared
+2026-01-03T17:56:11.8740679Z [WARN] RedrawEventsCleared emitted without explicit MainEventsCleared
+2026-01-03T17:56:14.524037Z [WARN] NewEvents emitted without explicit RedrawEventsCleared
+2026-01-03T17:56:14.5259275Z [WARN] RedrawEventsCleared emitted without explicit MainEventsCleared
+2026-01-03T17:56:14.611685Z [INFO] [MACROS] Saved 1 macros to config
+2026-01-03T17:56:14.6117271Z [INFO] [MACRO] Updated: Farm
+2026-01-03T17:56:24.8582187Z [INFO] [AUTO_CLICKER] Hotkey VK cached: BA
+2026-01-03T17:56:24.8582821Z [INFO] [AUTO_CLICKER] Hotkey set to: ;
+2026-01-03T17:56:25.8765413Z [WARN] NewEvents emitted without explicit RedrawEventsCleared
+2026-01-03T17:56:25.8788857Z [WARN] RedrawEventsCleared emitted without explicit MainEventsCleared
+2026-01-03T17:56:29.7836713Z [WARN] NewEvents emitted without explicit RedrawEventsCleared
+2026-01-03T17:56:29.7858296Z [WARN] RedrawEventsCleared emitted without explicit MainEventsCleared
+2026-01-03T17:56:29.8350689Z [INFO] [MACROS] Saved 1 macros to config
+2026-01-03T17:56:29.8351136Z [INFO] [MACRO] Updated: Farm
+2026-01-03T17:56:31.8041093Z [INFO] [AUTO_CLICKER] Toggled: false -> true
+2026-01-03T17:56:31.8041973Z [INFO] [AUTO_CLICKER] Thread started (Background Mode - PostMessage to game window)
+2026-01-03T17:56:32.300075Z [INFO] [AUTO_CLICKER] Toggled: true -> false
+2026-01-03T17:56:33.8050148Z [INFO] [AUTO_CLICKER] Thread stopped
+2026-01-03T17:56:52.0763388Z [INFO] [MACRO] Starting: Farm
+2026-01-03T17:57:10.2775106Z [INFO] [MACRO] Finished: Farm
+2026-01-03T17:57:30.9537013Z [INFO] [MACROS] Saved 1 macros to config
+2026-01-03T17:57:30.9537725Z [INFO] [MACRO] Updated: Farm
+2026-01-03T17:57:32.1301145Z [INFO] [MACRO] Starting: Farm
+2026-01-03T17:57:42.0849082Z [INFO] [MACRO] Finished: Farm
+2026-01-03T17:58:05.2854737Z [INFO] [MACROS] Saved 1 macros to config
+2026-01-03T17:58:05.2855392Z [INFO] [MACRO] Updated: Farm
+2026-01-03T17:58:06.2528739Z [INFO] [MACRO] Starting: Farm
+2026-01-03T17:58:18.8194578Z [INFO] [MACRO] Finished: Farm

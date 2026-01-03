@@ -3074,6 +3074,9 @@ static mut CACHED_AUTO_CLICKER_VK: u32 = 0x77; // F8 (default)
 static mut KEYBINDINGS_DISABLED: bool = false; // Disable during recording
 static mut RECORDING_MODE: bool = false;       // When true, emit key names instead of actions
 
+// Cached macro hotkeys: Vec of (macro_id, vk_code)
+static CACHED_MACRO_HOTKEYS: RwLock<Vec<(String, u32)>> = RwLock::new(Vec::new());
+
 // Convert VK code to key name string
 fn vk_to_key(vk: u32) -> Option<String> {
     match vk {
@@ -3128,6 +3131,52 @@ pub fn refresh_auto_clicker_hotkey() {
     app_log!("[AUTO_CLICKER] Hotkey VK cached: {:02X}", unsafe { CACHED_AUTO_CLICKER_VK });
 }
 
+// Refresh cached macro hotkeys from the macros list
+fn refresh_macro_hotkeys() {
+    let macros = get_macros();
+    let mut hotkeys: Vec<(String, u32)> = Vec::new();
+    
+    for m in macros {
+        if !m.hotkey.is_empty() {
+            if let Some(vk) = key_to_vk(&m.hotkey) {
+                hotkeys.push((m.id.clone(), vk));
+                app_log!("[MACRO] Hotkey cached: '{}' -> {:02X} for '{}'", m.hotkey, vk, m.name);
+            }
+        }
+    }
+    
+    if let Ok(mut guard) = CACHED_MACRO_HOTKEYS.write() {
+        *guard = hotkeys;
+    }
+}
+
+// Check if a VK code matches any macro hotkey and return the macro ID
+fn get_macro_for_hotkey(vk: u32) -> Option<String> {
+    if let Ok(guard) = CACHED_MACRO_HOTKEYS.read() {
+        for (id, cached_vk) in guard.iter() {
+            if *cached_vk == vk {
+                return Some(id.clone());
+            }
+        }
+    }
+    None
+}
+
+// Toggle a macro - if running, stop it; if not running, start it
+fn toggle_macro(id: &str, app_handle: &AppHandle) {
+    // If this macro is already running, stop it
+    if MACRO_RUNNING.load(Ordering::SeqCst) {
+        stop_macro();
+        app_log!("[MACRO] Stopped via hotkey");
+        let _ = app_handle.emit("macro-stopped", id);
+    } else {
+        // Start the macro
+        if let Err(e) = run_macro(id, app_handle) {
+            app_log!("[MACRO] Failed to start via hotkey: {}", e);
+        }
+    }
+}
+
 // Low-level keyboard hook callback for all keybindings
 unsafe extern "system" fn low_level_keyboard_proc(
     ncode: i32,
@@ -3171,6 +3220,9 @@ unsafe extern "system" fn low_level_keyboard_proc(
                         // Toggle auto clicker directly and emit state change
                         let new_state = toggle_auto_clicker();
                         let _ = app_handle.emit("auto-clicker-toggled", new_state);
+                    } else if let Some(macro_id) = get_macro_for_hotkey(vk) {
+                        // Toggle macro via hotkey
+                        toggle_macro(&macro_id, app_handle);
                     }
                 }
             }
@@ -3545,6 +3597,7 @@ fn load_macros_from_config() {
         if let Ok(macros) = serde_json::from_value::<Vec<CustomMacro>>(macros_val.clone()) {
             set_macros(macros.clone());
             app_log!("[MACROS] Loaded {} macros from config", macros.len());
+            refresh_macro_hotkeys();
         }
     }
 }
@@ -3555,6 +3608,7 @@ fn save_macros_to_config() {
     config["macros"] = serde_json::to_value(&macros).unwrap_or_default();
     save_config(&config);
     app_log!("[MACROS] Saved {} macros to config", macros.len());
+    refresh_macro_hotkeys();
 }
 
 // Parse macro script into actions

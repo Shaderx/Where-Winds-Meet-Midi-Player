@@ -7,7 +7,7 @@
     "enabled": false,
     "enabled2": false,
     "game_window_found": false,
-    "hotkey": "F5",
+    "hotkey": ";",
     "key": "y",
     "key2": ""
   },
@@ -20,10 +20,19 @@
     "stop": "F12",
     "toggle_mini": "Insert"
   },
+  "macros": [
+    {
+      "enabled": true,
+      "hotkey": "'",
+      "id": "macro_1767462895381",
+      "name": "Farm",
+      "script": "loop {\nkey 4\nwait 5000\nhold space 2000\nhold space 200\nwait 1500\nkey q\nwait 1000\n}"
+    }
+  ],
   "window_position": {
     "height": 620,
     "width": 1180,
-    "x": 1419,
-    "y": -849
+    "x": 1156,
+    "y": -766
   }
 }

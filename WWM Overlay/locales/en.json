@@ -222,6 +222,7 @@
     "syntax": "Macro Syntax",
     "syntaxHold": "Hold key for 500ms",
     "syntaxKey": "Tap a key",
+    "syntaxLoop": "Loop forever (until stopped)",
     "syntaxNote": "Lines starting with # are comments",
     "syntaxRepeat": "Repeat 3 times",
     "syntaxWait": "Wait 100ms",
