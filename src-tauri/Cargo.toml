@@ -1,7 +1,7 @@
 [package]
 name = "wwm-overlay"
 version = "1.2.0"
-description = "MIDI Player Overlay for Black Desert"
+description = "MIDI Player Overlay for Where Wind Meets (Global)"
 authors = ["you"]
 edition = "2021"
 
